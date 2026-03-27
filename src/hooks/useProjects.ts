@@ -29,7 +29,7 @@ export function useProjects() {
       return (data || []).map((p: any) => ({
         ...p,
         features: (p.features as string[]) || [],
-        tags: p.tags || [],
+        tags: (p.tags as string[]) || [],
       }));
     },
   });
