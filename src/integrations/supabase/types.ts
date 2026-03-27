@@ -14,16 +14,274 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contact_messages: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_read: boolean
+          message: string
+          name: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          name?: string
+          subject?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          name?: string
+          subject?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          bio: string
+          created_at: string
+          email: string | null
+          full_name: string
+          github_url: string | null
+          hero_stats: Json | null
+          id: string
+          linkedin_url: string | null
+          photo_url: string | null
+          tagline: string
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          bio?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          github_url?: string | null
+          hero_stats?: Json | null
+          id?: string
+          linkedin_url?: string | null
+          photo_url?: string | null
+          tagline?: string
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          bio?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          github_url?: string | null
+          hero_stats?: Json | null
+          id?: string
+          linkedin_url?: string | null
+          photo_url?: string | null
+          tagline?: string
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      project_media: {
+        Row: {
+          alt: string | null
+          created_at: string
+          id: string
+          project_id: string
+          sort_order: number
+          url: string
+        }
+        Insert: {
+          alt?: string | null
+          created_at?: string
+          id?: string
+          project_id: string
+          sort_order?: number
+          url: string
+        }
+        Update: {
+          alt?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          sort_order?: number
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_media_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          demo_url: string | null
+          description: string
+          features: Json | null
+          github_url: string | null
+          id: string
+          published: boolean
+          short_description: string
+          sort_order: number
+          tags: Json | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          demo_url?: string | null
+          description?: string
+          features?: Json | null
+          github_url?: string | null
+          id?: string
+          published?: boolean
+          short_description?: string
+          sort_order?: number
+          tags?: Json | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          demo_url?: string | null
+          description?: string
+          features?: Json | null
+          github_url?: string | null
+          id?: string
+          published?: boolean
+          short_description?: string
+          sort_order?: number
+          tags?: Json | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      timeline_entries: {
+        Row: {
+          created_at: string
+          description: string
+          end_date: string | null
+          entry_type: string
+          id: string
+          organization: string
+          sort_order: number
+          start_date: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          end_date?: string | null
+          entry_type?: string
+          id?: string
+          organization?: string
+          sort_order?: number
+          start_date?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          end_date?: string | null
+          entry_type?: string
+          id?: string
+          organization?: string
+          sort_order?: number
+          start_date?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      profiles_public: {
+        Row: {
+          bio: string | null
+          full_name: string | null
+          github_url: string | null
+          hero_stats: Json | null
+          id: string | null
+          linkedin_url: string | null
+          photo_url: string | null
+          tagline: string | null
+          title: string | null
+        }
+        Insert: {
+          bio?: string | null
+          full_name?: string | null
+          github_url?: string | null
+          hero_stats?: Json | null
+          id?: string | null
+          linkedin_url?: string | null
+          photo_url?: string | null
+          tagline?: string | null
+          title?: string | null
+        }
+        Update: {
+          bio?: string | null
+          full_name?: string | null
+          github_url?: string | null
+          hero_stats?: Json | null
+          id?: string | null
+          linkedin_url?: string | null
+          photo_url?: string | null
+          tagline?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +408,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
