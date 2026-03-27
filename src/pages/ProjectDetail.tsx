@@ -220,11 +220,11 @@ export default function ProjectDetail() {
                       key={item.id}
                       className="rounded-xl overflow-hidden border border-border bg-muted"
                     >
-                      {item.file_type === "video" ? (
-                        <video src={item.file_url} controls className="w-full" />
+                      {item.url.endsWith(".mp4") || item.url.endsWith(".webm") ? (
+                        <video src={item.url} controls className="w-full" />
                       ) : (
                         <img
-                          src={item.file_url}
+                          src={item.url}
                           alt=""
                           className="w-full h-auto"
                           loading="lazy"

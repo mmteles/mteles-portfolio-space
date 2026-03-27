@@ -29,7 +29,7 @@ export function useProjects() {
       return (data || []).map((p: any) => ({
         ...p,
         features: (p.features as string[]) || [],
-        tags: p.tags || [],
+        tags: (p.tags as string[]) || [],
       }));
     },
   });
@@ -49,8 +49,8 @@ export function useProject(id: string) {
       return {
         ...data,
         features: (data.features as string[]) || [],
-        tags: data.tags || [],
-      };
+        tags: (data.tags as string[]) || [],
+      } as Project;
     },
     enabled: !!id,
   });
