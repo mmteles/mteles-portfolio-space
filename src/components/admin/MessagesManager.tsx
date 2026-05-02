@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { authGet, authPut } from "@/integrations/aws/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,17 @@ export default function MessagesManager() {
   }, []);
 
   const loadMessages = async () => {
-    const { data } = await supabase
-      .from("contact_messages")
-      .select("*")
-      .order("created_at", { ascending: false });
-    setMessages(data || []);
+    try {
+      const data = await authGet<any[]>("/admin/messages");
+      setMessages(data || []);
+    } catch { /* stay empty */ }
   };
 
   const markAsRead = async (id: string) => {
-    await supabase.from("contact_messages").update({ is_read: true }).eq("id", id);
-    loadMessages();
+    try {
+      await authPut(`/admin/messages/${id}/read`, {});
+      loadMessages();
+    } catch { /* non-fatal */ }
   };
 
   const unreadCount = messages.filter((m) => !m.is_read).length;

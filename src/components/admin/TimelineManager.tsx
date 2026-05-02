@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { authGet, authPost, authPut, authDelete } from "@/integrations/aws/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,11 +44,10 @@ export default function TimelineManager() {
   }, []);
 
   const loadEntries = async () => {
-    const { data } = await supabase
-      .from("timeline_entries")
-      .select("*")
-      .order("sort_order", { ascending: true });
-    setEntries(data || []);
+    try {
+      const data = await authGet<any[]>("/admin/timeline");
+      setEntries(data || []);
+    } catch { /* stay empty */ }
   };
 
   const openNew = () => {
@@ -89,30 +88,32 @@ export default function TimelineManager() {
       sort_order: form.sort_order,
     };
 
-    let error;
-    if (editing && form.id) {
-      ({ error } = await supabase.from("timeline_entries").update(payload).eq("id", form.id));
-    } else {
-      ({ error } = await supabase.from("timeline_entries").insert(payload));
-    }
-
-    if (error) {
-      toast({ title: "Error saving entry", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      if (editing && form.id) {
+        await authPut(`/admin/timeline/${form.id}`, payload);
+      } else {
+        await authPost("/admin/timeline", payload);
+      }
       toast({ title: `Entry ${editing ? "updated" : "created"}` });
       setOpen(false);
       loadEntries();
+    } catch (err: unknown) {
+      toast({
+        title: "Error saving entry",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
     }
     setSaving(false);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this entry?")) return;
-    const { error } = await supabase.from("timeline_entries").delete().eq("id", id);
-    if (error) {
-      toast({ title: "Error deleting entry", variant: "destructive" });
-    } else {
+    try {
+      await authDelete(`/admin/timeline/${id}`);
       loadEntries();
+    } catch {
+      toast({ title: "Error deleting entry", variant: "destructive" });
     }
   };
 

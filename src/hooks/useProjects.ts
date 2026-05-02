@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { apiGet } from "@/integrations/aws/client";
 
 export interface Project {
   id: string;
@@ -19,14 +19,10 @@ export interface Project {
 export function useProjects() {
   return useQuery<Project[]>({
     queryKey: ["projects"],
-    staleTime: 5 * 60 * 1000, // treat data as fresh for 5 min — avoids re-fetch on navigation
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data || []).map((p: any) => ({
+      const data = await apiGet<Project[]>("/projects");
+      return (data || []).map((p) => ({
         ...p,
         features: (p.features as string[]) || [],
         tags: (p.tags as string[]) || [],
@@ -39,18 +35,13 @@ export function useProject(id: string) {
   return useQuery<Project | null>({
     queryKey: ["project", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      if (error) throw error;
+      const data = await apiGet<Project>(`/projects/${id}`);
       if (!data) return null;
       return {
         ...data,
         features: (data.features as string[]) || [],
         tags: (data.tags as string[]) || [],
-      } as Project;
+      };
     },
     enabled: !!id,
   });
@@ -59,15 +50,7 @@ export function useProject(id: string) {
 export function useProjectMedia(projectId: string) {
   return useQuery({
     queryKey: ["project-media", projectId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("project_media")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () => apiGet(`/projects/${projectId}/media`),
     enabled: !!projectId,
   });
 }

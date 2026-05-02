@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { forgotPassword } from "@/integrations/aws/auth";
 
 type Mode = "signin" | "forgot" | "forgot-sent";
 
@@ -40,12 +40,11 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const redirectTo = `${window.location.origin}/reset-password`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    if (error) {
-      setError(error.message);
-    } else {
+    try {
+      await forgotPassword(email);
       setMode("forgot-sent");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to send reset code.");
     }
     setLoading(false);
   };
@@ -226,9 +225,9 @@ export default function Login() {
                 Check your inbox
               </h2>
               <p className="text-sm text-muted-foreground mb-6">
-                A password reset link has been sent to{" "}
+                A 6-digit reset code has been sent to{" "}
                 <span className="font-medium text-foreground">{email}</span>.
-                The link expires in 1 hour.
+                Enter the code on the Reset Password page.
               </p>
               <button
                 type="button"

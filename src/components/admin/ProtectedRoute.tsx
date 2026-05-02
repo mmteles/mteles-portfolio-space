@@ -1,12 +1,11 @@
 import { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 
 const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { loading, isAdmin, user } = useAuth();
+  const { loading, isAdmin, user, signOut } = useAuth();
 
   // Auto sign-out after 5 minutes of inactivity — only active while logged in
   useEffect(() => {
@@ -16,7 +15,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
     const resetTimer = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => supabase.auth.signOut(), INACTIVITY_TIMEOUT);
+      timer = setTimeout(() => signOut(), INACTIVITY_TIMEOUT);
     };
 
     const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];

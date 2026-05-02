@@ -1,49 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, KeyRound, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, KeyRound, CheckCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { confirmNewPassword } from "@/integrations/aws/auth";
 
-type PageState = "loading" | "ready" | "saving" | "success" | "invalid";
+// Cognito sends a 6-digit code to the user's email (not a magic link).
+// The user enters their email, the code, and a new password here.
+
+type PageState = "ready" | "saving" | "success";
 
 export default function ResetPassword() {
-  const [pageState, setPageState] = useState<PageState>("loading");
+  const [pageState, setPageState] = useState<PageState>("ready");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Supabase processes the recovery token from the URL hash automatically
-  // and fires PASSWORD_RECOVERY when the session is established.
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event) => {
-        if (event === "PASSWORD_RECOVERY") {
-          setPageState("ready");
-        }
-      }
-    );
-
-    // Give Supabase a moment to process the URL hash; if no event fires,
-    // the link is invalid or expired.
-    const timeout = setTimeout(() => {
-      setPageState((prev) => (prev === "loading" ? "invalid" : prev));
-    }, 3000);
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters.");
       return;
     }
     if (password !== confirm) {
@@ -52,15 +34,12 @@ export default function ResetPassword() {
     }
 
     setPageState("saving");
-    const { error } = await supabase.auth.updateUser({ password });
-
-    if (error) {
-      setError(error.message);
-      setPageState("ready");
-    } else {
-      // Sign out so the user logs in fresh with the new password
-      await supabase.auth.signOut();
+    try {
+      await confirmNewPassword(email, code.trim(), password);
       setPageState("success");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Invalid code or the code has expired.");
+      setPageState("ready");
     }
   };
 
@@ -77,36 +56,6 @@ export default function ResetPassword() {
 
         <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
 
-          {/* Loading — processing token */}
-          {pageState === "loading" && (
-            <div className="flex flex-col items-center gap-4 py-4">
-              <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-muted-foreground">Verifying reset link…</p>
-            </div>
-          )}
-
-          {/* Invalid / expired link */}
-          {pageState === "invalid" && (
-            <div className="text-center py-2">
-              <div className="flex justify-center mb-4">
-                <AlertCircle className="h-12 w-12 text-destructive" />
-              </div>
-              <h2 className="text-lg font-serif font-bold text-foreground mb-2">
-                Link invalid or expired
-              </h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                This reset link has expired or already been used. Please request
-                a new one.
-              </p>
-              <Link
-                to="/login"
-                className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
-              >
-                Request a new link
-              </Link>
-            </div>
-          )}
-
           {/* Set new password form */}
           {(pageState === "ready" || pageState === "saving") && (
             <>
@@ -119,34 +68,59 @@ export default function ResetPassword() {
                     Set New Password
                   </h1>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Choose a strong password
+                    Enter the code sent to your email
                   </p>
                 </div>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="new-password" className="text-sm font-medium">
-                    New password
-                  </Label>
+                  <Label htmlFor="reset-email" className="text-sm font-medium">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    autoFocus
+                    className="mt-1.5 h-10"
+                    placeholder="admin@example.com"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="reset-code" className="text-sm font-medium">Reset Code</Label>
+                  <Input
+                    id="reset-code"
+                    type="text"
+                    inputMode="numeric"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    required
+                    className="mt-1.5 h-10 tracking-widest"
+                    placeholder="123456"
+                    maxLength={6}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="new-password" className="text-sm font-medium">New Password</Label>
                   <Input
                     id="new-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
-                    autoFocus
+                    minLength={12}
                     autoComplete="new-password"
                     className="mt-1.5 h-10"
-                    placeholder="Minimum 6 characters"
+                    placeholder="Minimum 12 characters"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="confirm-password" className="text-sm font-medium">
-                    Confirm password
-                  </Label>
+                  <Label htmlFor="confirm-password" className="text-sm font-medium">Confirm Password</Label>
                   <Input
                     id="confirm-password"
                     type="password"
@@ -193,8 +167,7 @@ export default function ResetPassword() {
                 Password updated
               </h2>
               <p className="text-sm text-muted-foreground mb-6">
-                Your password has been changed. Please sign in with your new
-                password.
+                Your password has been changed. Please sign in with your new password.
               </p>
               <Button
                 className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white"
