@@ -25,6 +25,7 @@ permissions:
 env:
   AWS_REGION: us-west-2
   NODE_VERSION: "22"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-deploy:
