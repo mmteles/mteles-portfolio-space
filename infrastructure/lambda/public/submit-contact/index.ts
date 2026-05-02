@@ -52,6 +52,16 @@ export const handler = async (
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> => {
   try {
+    // Validate required environment variables
+    const contactFromEmail = process.env.CONTACT_FROM_EMAIL;
+    const contactToEmail = process.env.CONTACT_TO_EMAIL;
+    if (!contactFromEmail || contactFromEmail.trim() === "") {
+      return serverError(new Error("CONTACT_FROM_EMAIL environment variable is not set"));
+    }
+    if (!contactToEmail || contactToEmail.trim() === "") {
+      return serverError(new Error("CONTACT_TO_EMAIL environment variable is not set"));
+    }
+
     let body: Record<string, unknown>;
     try {
       body = JSON.parse(event.body ?? "{}");
@@ -92,8 +102,8 @@ export const handler = async (
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "Portfolio Contact <onboarding@resend.dev>",
-          to: ["mauricio.mteles@gmail.com"],
+          from: contactFromEmail,
+          to: [contactToEmail],
           reply_to: email,
           subject: `[Portfolio] ${escape(subject)}`,
           html: `

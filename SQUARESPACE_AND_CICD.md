@@ -23,15 +23,21 @@ CloudFront requires your SSL certificate to live in **us-east-1**, regardless
 of where your other AWS resources are.
 
 ```bash
-# Request a cert covering both root domain and www subdomain
+# Request a cert covering both root domain and www subdomain (for CloudFront)
 aws acm request-certificate \
   --domain-name "mteles.com" \
-  --subject-alternative-names "www.mteles.com" "api.mteles.com" \
+  --subject-alternative-names "www.mteles.com" \
   --validation-method DNS \
   --region us-east-1
 
 # The output gives you a CertificateArn like:
 # arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+# Request a separate cert for the API custom domain (REGIONAL endpoint requires same-region cert)
+aws acm request-certificate \
+  --domain-name "api.mteles.com" \
+  --validation-method DNS \
+  --region us-west-2
 ```
 
 AWS will give you CNAME records to prove domain ownership. Add them in
@@ -75,14 +81,10 @@ so use `www` as your primary domain (redirect root → www from Squarespace pane
 To also redirect the root (`mteles.com`) to `www`:
 - In Squarespace Domains → **URL Redirects** → add: `mteles.com` → `https://www.mteles.com` (301 permanent)
 
-#### 2c. API subdomain record (optional — for a custom API URL)
+#### 2c. API subdomain record (added after Step 4 when custom domain is created)
 
-| Type | Host | Data | TTL |
-|---|---|---|---|
-| CNAME | `api` | `xxxxxxxxxx.execute-api.us-west-2.amazonaws.com` | 3600 |
-
-> Get the API Gateway domain from CDK output `ApiUrl`, stripping the `https://` prefix
-> and the path suffix (everything after `.amazonaws.com`).
+See Step 4 for instructions on creating the API Gateway custom domain and obtaining
+the correct CNAME target (`DomainNameConfigurations[0].ApiGatewayDomainName`).
 
 ---
 
@@ -110,9 +112,9 @@ cd infrastructure && npx cdk deploy MtelesPortfolioStack
 ### Step 4: Add custom domain to API Gateway (optional)
 
 ```bash
-# Get your cert ARN
-CERT_ARN=$(aws acm list-certificates --region us-east-1 \
-  --query "CertificateSummaryList[?DomainName=='mteles.com'].CertificateArn" \
+# Get your cert ARN (from the us-west-2 certificate requested in Step 1)
+CERT_ARN=$(aws acm list-certificates --region us-west-2 \
+  --query "CertificateSummaryList[?DomainName=='api.mteles.com'].CertificateArn" \
   --output text)
 
 # Get your API ID
@@ -120,7 +122,7 @@ API_ID=$(aws apigatewayv2 get-apis \
   --query "Items[?Name=='portfolio-api'].ApiId" \
   --output text)
 
-# Create custom domain
+# Create custom domain (using the us-west-2 certificate for REGIONAL endpoint)
 aws apigatewayv2 create-domain-name \
   --domain-name "api.mteles.com" \
   --domain-name-configurations \
@@ -133,13 +135,16 @@ aws apigatewayv2 create-api-mapping \
   --stage '$default'
 
 # Get the target value for your DNS CNAME
-aws apigatewayv2 get-domain-name \
+API_GATEWAY_DOMAIN=$(aws apigatewayv2 get-domain-name \
   --domain-name "api.mteles.com" \
   --query "DomainNameConfigurations[0].ApiGatewayDomainName" \
-  --output text
+  --output text)
+
+echo "Add this CNAME in Squarespace:"
+echo "Type: CNAME | Host: api | Data: $API_GATEWAY_DOMAIN | TTL: 3600"
 ```
 
-Add the output as a CNAME for `api` in Squarespace.
+Add the returned `ApiGatewayDomainName` (d-xxxx.execute-api.us-west-2.amazonaws.com) as a CNAME for `api` in Squarespace.
 
 Then update `VITE_API_URL` in your GitHub Secrets to `https://api.mteles.com`.
 
@@ -181,11 +186,14 @@ Before the workflows can run, you need to deploy the OIDC role once manually:
 ```bash
 # 1. Configure your AWS CLI
 aws configure
-# Enter your Access Key, Secret Key, region (us-east-1)
+# Enter your Access Key, Secret Key, region (us-west-2)
 
 # 2. Bootstrap CDK (one-time per AWS account)
 cd infrastructure
 npm install
+npx cdk bootstrap aws://YOUR_ACCOUNT_ID/us-west-2
+
+# If you manage CloudFront certificates via CDK, also bootstrap us-east-1:
 npx cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-1
 
 # 3. Deploy the stack — this creates the GitHub OIDC role

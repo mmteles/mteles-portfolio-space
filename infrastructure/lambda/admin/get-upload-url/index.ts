@@ -54,7 +54,7 @@ export const handler = async (
     const ext = dotIdx !== -1 ? filename.slice(dotIdx + 1).toLowerCase() : "";
     const suffix = ext ? `.${ext}` : "";
     const key = bucket === "resume"
-      ? `resume-${Date.now()}${suffix}`
+      ? `resume/${Date.now()}${suffix}`
       : `${randomUUID()}${suffix}`;
 
     const command = new PutObjectCommand({
