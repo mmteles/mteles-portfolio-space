@@ -1,0 +1,94 @@
+name: Deploy Frontend
+
+# Runs when frontend source changes land on main.
+# Builds the React/Vite app and syncs to S3, then invalidates CloudFront.
+# If you keep Lovable.dev for hosting, disable this workflow — Lovable
+# auto-deploys on every push to main already.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "tailwind.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  NODE_VERSION: "22"
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-frontend-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Node.js ─────────────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      # ── AWS credentials via OIDC ─────────────────────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── Install dependencies ──────────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Build ─────────────────────────────────────────────────────────────────
+      # Vite env vars must be injected at build time (VITE_ prefix)
+      - name: Build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_COGNITO_USER_POOL_ID: ${{ secrets.VITE_COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ secrets.VITE_COGNITO_CLIENT_ID }}
+          VITE_STORAGE_BASE_URL: ${{ secrets.VITE_STORAGE_BASE_URL }}
+        run: npm run build
+
+      # ── Sync to S3 ───────────────────────────────────────────────────────────
+      # Strategy: immutable assets (hashed filenames) get long cache;
+      #           index.html + manifest get no-cache so browsers always re-fetch.
+      - name: Sync assets to S3 (long-lived cache)
+        run: |
+          aws s3 sync dist/ s3://${{ secrets.AWS_FRONTEND_BUCKET }}/ \
+            --exclude "index.html" \
+            --exclude "*.json" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete
+
+      - name: Sync HTML + manifests to S3 (no-cache)
+        run: |
+          aws s3 sync dist/ s3://${{ secrets.AWS_FRONTEND_BUCKET }}/ \
+            --exclude "*" \
+            --include "index.html" \
+            --include "*.json" \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+      # ── Invalidate CloudFront ────────────────────────────────────────────────
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.AWS_CF_DISTRIBUTION_ID }} \
+            --paths "/*"

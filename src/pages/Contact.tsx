@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
+import { apiPost } from "@/integrations/aws/client";
 
 const contactSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
@@ -58,32 +58,18 @@ export default function Contact() {
     }
 
     setSubmitting(true);
-    const { error } = await supabase.from("contact_messages").insert({
-      name: result.data.name,
-      email: result.data.email,
-      subject: result.data.subject,
-      message: result.data.message,
-    });
-
-    if (error) {
-      toast({ title: "Failed to send message. Please try again.", variant: "destructive" });
-    } else {
-      // Also send email notification
-      try {
-        await supabase.functions.invoke("send-contact-email", {
-          body: {
-            name: result.data.name,
-            email: result.data.email,
-            subject: result.data.subject,
-            message: result.data.message,
-          },
-        });
-      } catch {
-        // Email is best-effort; message is already saved to DB
-      }
+    try {
+      await apiPost("/contact", {
+        name: result.data.name,
+        email: result.data.email,
+        subject: result.data.subject,
+        message: result.data.message,
+      });
       lastSubmitRef.current = now;
       setSubmitted(true);
       setForm({ name: "", email: "", subject: "", message: "" });
+    } catch {
+      toast({ title: "Failed to send message. Please try again.", variant: "destructive" });
     }
     setSubmitting(false);
   };

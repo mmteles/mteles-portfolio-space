@@ -1,12 +1,26 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { authPost } from "@/integrations/aws/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, Trash2 } from "lucide-react";
 
+interface UploadUrlResponse {
+  uploadUrl: string;
+  publicUrl: string;
+  key: string;
+}
+
+interface ResumeFile {
+  key: string;
+  publicUrl: string;
+  name: string;
+}
+
+const STORAGE_BASE_URL = ((import.meta.env.VITE_STORAGE_BASE_URL as string) ?? "").replace(/\/$/, "");
+
 export default function ResumeManager() {
-  const [files, setFiles] = useState<any[]>([]);
+  const [files, setFiles] = useState<ResumeFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -15,9 +29,19 @@ export default function ResumeManager() {
     loadFiles();
   }, []);
 
-  const loadFiles = async () => {
-    const { data } = await supabase.storage.from("resume").list();
-    setFiles(data || []);
+  // List resume files by fetching known resume URL from storage base URL.
+  // Since there's no list API, we store the current resume info in localStorage
+  // so the admin panel can display it after upload.
+  const loadFiles = () => {
+    try {
+      const stored = localStorage.getItem("portfolio_resume_files");
+      if (stored) setFiles(JSON.parse(stored));
+    } catch { /* ignore */ }
+  };
+
+  const persistFiles = (updated: ResumeFile[]) => {
+    localStorage.setItem("portfolio_resume_files", JSON.stringify(updated));
+    setFiles(updated);
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,31 +58,43 @@ export default function ResumeManager() {
     }
 
     setUploading(true);
+    try {
+      // Step 1: get a presigned S3 PUT URL from the API
+      const { uploadUrl, publicUrl, key } = await authPost<UploadUrlResponse>("/admin/upload-url", {
+        bucket: "resume",
+        filename: file.name,
+        contentType: file.type,
+      });
 
-    // Delete existing resume files first
-    for (const f of files) {
-      await supabase.storage.from("resume").remove([f.name]);
-    }
+      // Step 2: PUT the file directly to S3 (no Lambda involved)
+      const s3Res = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!s3Res.ok) throw new Error("S3 upload failed");
 
-    const { error } = await supabase.storage
-      .from("resume")
-      .upload(`resume-${Date.now()}.pdf`, file, { upsert: true });
-
-    if (error) {
-      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
-    } else {
+      // Track the uploaded file locally
+      const newFile: ResumeFile = { key, publicUrl, name: file.name };
+      persistFiles([newFile]); // replace — only one resume at a time
       toast({ title: "Resume uploaded successfully" });
-      loadFiles();
+    } catch (err: unknown) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
     }
     setUploading(false);
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const handleDelete = async (name: string) => {
+  const handleDelete = (key: string) => {
     if (!confirm("Delete this resume file?")) return;
-    await supabase.storage.from("resume").remove([name]);
-    loadFiles();
-    toast({ title: "Resume deleted" });
+    // Remove from local tracking — the S3 object stays until overwritten by the next upload.
+    // To hard-delete from S3, add a DELETE /admin/resume/:key endpoint.
+    persistFiles(files.filter((f) => f.key !== key));
+    toast({ title: "Resume removed from listing" });
   };
 
   return (
@@ -89,33 +125,30 @@ export default function ResumeManager() {
 
         {files.length > 0 ? (
           <div className="space-y-2">
-            {files.map((file) => {
-              const { data } = supabase.storage.from("resume").getPublicUrl(file.name);
-              return (
-                <div
-                  key={file.name}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+            {files.map((file) => (
+              <div
+                key={file.key}
+                className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+              >
+                <a
+                  href={file.publicUrl || `${STORAGE_BASE_URL}/resume/${file.key}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
                 >
-                  <a
-                    href={data.publicUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
-                  >
-                    <FileText className="h-4 w-4" />
-                    {file.name}
-                  </a>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(file.name)}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              );
-            })}
+                  <FileText className="h-4 w-4" />
+                  {file.name}
+                </a>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(file.key)}
+                  className="text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">No resume uploaded yet.</p>

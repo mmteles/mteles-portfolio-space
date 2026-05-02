@@ -1,20 +1,9 @@
 import { Linkedin, Github, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function Footer() {
-  const { data: profile } = useQuery({
-    queryKey: ["profile"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles_public" as any)
-        .select("*")
-        .limit(1)
-        .maybeSingle();
-      return data as any;
-    },
-  });
+  const { data: profile } = useProfile();
 
   return (
     <footer className="bg-primary text-primary-foreground">

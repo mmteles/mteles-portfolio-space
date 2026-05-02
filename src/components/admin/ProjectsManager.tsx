@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { authGet, authPost, authPut, authDelete } from "@/integrations/aws/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,11 +49,10 @@ export default function ProjectsManager() {
   }, []);
 
   const loadProjects = async () => {
-    const { data } = await supabase
-      .from("projects")
-      .select("*")
-      .order("sort_order", { ascending: true });
-    setProjects(data || []);
+    try {
+      const data = await authGet<any[]>("/admin/projects");
+      setProjects(data || []);
+    } catch { /* stay empty */ }
   };
 
   const openNew = () => {
@@ -106,30 +105,32 @@ export default function ProjectsManager() {
       published: form.published,
     };
 
-    let error;
-    if (editing && form.id) {
-      ({ error } = await supabase.from("projects").update(payload).eq("id", form.id));
-    } else {
-      ({ error } = await supabase.from("projects").insert(payload));
-    }
-
-    if (error) {
-      toast({ title: "Error saving project", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      if (editing && form.id) {
+        await authPut(`/admin/projects/${form.id}`, payload);
+      } else {
+        await authPost("/admin/projects", payload);
+      }
       toast({ title: `Project ${editing ? "updated" : "created"}` });
       setOpen(false);
       loadProjects();
+    } catch (err: unknown) {
+      toast({
+        title: "Error saving project",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
     }
     setSaving(false);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this project?")) return;
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error) {
-      toast({ title: "Error deleting project", variant: "destructive" });
-    } else {
+    try {
+      await authDelete(`/admin/projects/${id}`);
       loadProjects();
+    } catch {
+      toast({ title: "Error deleting project", variant: "destructive" });
     }
   };
 

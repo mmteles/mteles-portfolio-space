@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { apiGet } from "@/integrations/aws/client";
 
 export interface Project {
   id: string;
@@ -12,21 +12,17 @@ export interface Project {
   github_url: string | null;
   thumbnail_url: string | null;
   sort_order: number;
-  published: boolean;
+  published?: boolean;
   created_at: string;
 }
 
 export function useProjects() {
   return useQuery<Project[]>({
     queryKey: ["projects"],
-    staleTime: 5 * 60 * 1000, // treat data as fresh for 5 min — avoids re-fetch on navigation
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data || []).map((p: any) => ({
+      const data = await apiGet<Project[]>("/projects");
+      return (data || []).map((p) => ({
         ...p,
         features: (p.features as string[]) || [],
         tags: (p.tags as string[]) || [],
@@ -39,18 +35,17 @@ export function useProject(id: string) {
   return useQuery<Project | null>({
     queryKey: ["project", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) return null;
-      return {
-        ...data,
-        features: (data.features as string[]) || [],
-        tags: (data.tags as string[]) || [],
-      } as Project;
+      try {
+        const data = await apiGet<Project>(`/projects/${id}`);
+        return {
+          ...data,
+          features: (data.features as string[]) || [],
+          tags: (data.tags as string[]) || [],
+        };
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message.includes("404")) return null;
+        throw err;
+      }
     },
     enabled: !!id,
   });
@@ -59,15 +54,7 @@ export function useProject(id: string) {
 export function useProjectMedia(projectId: string) {
   return useQuery({
     queryKey: ["project-media", projectId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("project_media")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () => apiGet(`/projects/${projectId}/media`),
     enabled: !!projectId,
   });
 }

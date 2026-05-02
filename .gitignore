@@ -12,6 +12,19 @@ dist
 dist-ssr
 *.local
 
+# Environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# CDK build artifacts
+infrastructure/cdk.out/
+infrastructure/cdk-outputs.json
+infrastructure/cdk.context.json
+
+# Claude Code local session data
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

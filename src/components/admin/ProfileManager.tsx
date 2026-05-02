@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { authGet, authPut } from "@/integrations/aws/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,15 +43,25 @@ export default function ProfileManager() {
   }, []);
 
   const loadProfile = async () => {
-    const { data } = await supabase.from("profiles").select("*").limit(1).maybeSingle();
-    if (data) {
-      setProfile({
-        ...data,
-        photo_url: data.photo_url || "",
-        linkedin_url: data.linkedin_url || "",
-        github_url: data.github_url || "",
-        email: data.email || "",
-        hero_stats: (data.hero_stats as Array<{ label: string; value: string }>) || [],
+    try {
+      const data = await authGet<ProfileData>("/admin/profile");
+      if (data) {
+        setProfile({
+          ...data,
+          photo_url: data.photo_url || "",
+          linkedin_url: data.linkedin_url || "",
+          github_url: data.github_url || "",
+          email: data.email || "",
+          hero_stats: (data.hero_stats as Array<{ label: string; value: string }>) || [],
+        });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("404") || msg.includes("not found")) return; // no profile yet — stay empty
+      toast({
+        title: "Failed to load profile",
+        description: msg || "Unknown error",
+        variant: "destructive",
       });
     }
   };
@@ -70,18 +80,16 @@ export default function ProfileManager() {
       hero_stats: profile.hero_stats,
     };
 
-    let error;
-    if (profile.id) {
-      ({ error } = await supabase.from("profiles").update(payload).eq("id", profile.id));
-    } else {
-      ({ error } = await supabase.from("profiles").insert(payload));
-    }
-
-    if (error) {
-      toast({ title: "Error saving profile", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await authPut("/admin/profile", payload);
       toast({ title: "Profile saved successfully" });
       loadProfile();
+    } catch (err: unknown) {
+      toast({
+        title: "Error saving profile",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
     }
     setSaving(false);
   };

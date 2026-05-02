@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { apiGet } from "@/integrations/aws/client";
 
 export interface TimelineEntry {
   id: string;
@@ -15,13 +15,6 @@ export interface TimelineEntry {
 export function useTimeline() {
   return useQuery<TimelineEntry[]>({
     queryKey: ["timeline"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("timeline_entries")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data as TimelineEntry[]) || [];
-    },
+    queryFn: () => apiGet<TimelineEntry[]>("/timeline"),
   });
 }

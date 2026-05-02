@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { apiGet } from "@/integrations/aws/client";
 
 export interface Profile {
   id: string;
@@ -10,25 +10,18 @@ export interface Profile {
   photo_url: string | null;
   linkedin_url: string | null;
   github_url: string | null;
-  hero_stats: Array<{ label: string; value: string }>;
+  hero_stats?: Array<{ label: string; value: string }> | null;
 }
 
 export function useProfile() {
-  return useQuery<Profile | null>({
+  return useQuery<Profile>({
     queryKey: ["profile"],
     queryFn: async () => {
-      // Use the profiles_public view which excludes sensitive fields (email)
-      const { data, error } = await supabase
-        .from("profiles_public" as any)
-        .select("*")
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) return null;
+      const data = await apiGet<Profile>("/profile");
       return {
-        ...(data as any),
-        hero_stats: ((data as any).hero_stats as Array<{ label: string; value: string }>) || [],
-      } as Profile;
+        ...data,
+        hero_stats: data.hero_stats ?? [],
+      };
     },
   });
 }
