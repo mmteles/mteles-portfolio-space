@@ -55,7 +55,15 @@ export default function ProfileManager() {
           hero_stats: (data.hero_stats as Array<{ label: string; value: string }>) || [],
         });
       }
-    } catch { /* no profile yet */ }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("404") || msg.includes("not found")) return; // no profile yet — stay empty
+      toast({
+        title: "Failed to load profile",
+        description: msg || "Unknown error",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSave = async () => {

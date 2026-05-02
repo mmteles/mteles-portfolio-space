@@ -59,18 +59,28 @@ export async function getAdminStatus(): Promise<boolean> {
   const token = await getCognitoToken();
   if (!token) return false;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    const groups: string[] = payload["cognito:groups"] ?? [];
-    return groups.includes("admin");
+    const apiUrl = ((import.meta.env.VITE_API_URL as string) ?? "").replace(/\/$/, "");
+    const res = await fetch(`${apiUrl}/admin/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return false;
+    const data = await res.json() as { isAdmin: boolean };
+    return data.isAdmin === true;
   } catch {
     return false;
   }
 }
 
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  const base64url = token.split(".")[1];
+  const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  return JSON.parse(atob(base64));
+}
+
 export function getUserFromToken(token: string | null): { id: string; email: string } | null {
   if (!token) return null;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    const payload = decodeJwtPayload(token);
     return { id: payload.sub as string, email: (payload.email as string) ?? "" };
   } catch {
     return null;

@@ -41,12 +41,17 @@ export class GitHubOidcConstruct extends Construct {
 
     const { githubOwner, githubRepo, branch = "main" } = props;
 
-    // GitHub OIDC provider — one per AWS account (idempotent)
-    const provider = new iam.OpenIdConnectProvider(this, "GitHubOidcProvider", {
-      url: "https://token.actions.githubusercontent.com",
-      clientIds: ["sts.amazonaws.com"],
-      thumbprints: ["6938fd4d98bab03faadb97b34396831e3780aea1"], // GitHub's OIDC thumbprint
-    });
+    // GitHub OIDC provider — one per AWS account.
+    // Pass the existing ARN via CDK context ("githubOidcProviderArn") to avoid
+    // a deployment error if the provider was already created in a prior stack.
+    const existingProviderArn = this.node.tryGetContext("githubOidcProviderArn") as string | undefined;
+    const provider = existingProviderArn
+      ? iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(this, "GitHubOidcProvider", existingProviderArn)
+      : new iam.OpenIdConnectProvider(this, "GitHubOidcProvider", {
+          url: "https://token.actions.githubusercontent.com",
+          clientIds: ["sts.amazonaws.com"],
+          thumbprints: ["6938fd4d98bab03faadb97b34396831e3780aea1"],
+        });
 
     // IAM role assumed by GitHub Actions
     this.deployRole = new iam.Role(this, "DeployRole", {

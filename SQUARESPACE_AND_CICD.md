@@ -12,7 +12,7 @@ a few records pointing to your CloudFront distribution.
 
 | Traffic | Goes to | DNS record needed |
 |---|---|---|
-| Website visitors (`mteles.com`) | CloudFront (frontend) | `CNAME` or `A` (ALIAS) |
+| Website visitors (`www.mteles.com`) | CloudFront (frontend) | `CNAME` (see Step 2b — Squarespace does not support apex ALIAS; use `www` as primary and redirect root → www) |
 | API calls (`api.mteles.com`) | API Gateway custom domain | `CNAME` |
 
 ---
@@ -225,7 +225,7 @@ aws cloudformation describe-stacks \
 
 ### How the full deploy flow works
 
-```
+```text
 git push origin main
         │
         ├─ files in infrastructure/ changed?

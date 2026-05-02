@@ -11,6 +11,7 @@ export const handler = async (
       SELECT id, full_name, title, tagline, bio, photo_url,
              linkedin_url, github_url, hero_stats, created_at, updated_at
       FROM profiles
+      ORDER BY created_at DESC
       LIMIT 1
     `);
 

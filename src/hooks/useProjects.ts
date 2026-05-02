@@ -12,7 +12,7 @@ export interface Project {
   github_url: string | null;
   thumbnail_url: string | null;
   sort_order: number;
-  published: boolean;
+  published?: boolean;
   created_at: string;
 }
 
@@ -35,13 +35,17 @@ export function useProject(id: string) {
   return useQuery<Project | null>({
     queryKey: ["project", id],
     queryFn: async () => {
-      const data = await apiGet<Project>(`/projects/${id}`);
-      if (!data) return null;
-      return {
-        ...data,
-        features: (data.features as string[]) || [],
-        tags: (data.tags as string[]) || [],
-      };
+      try {
+        const data = await apiGet<Project>(`/projects/${id}`);
+        return {
+          ...data,
+          features: (data.features as string[]) || [],
+          tags: (data.tags as string[]) || [],
+        };
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message.includes("404")) return null;
+        throw err;
+      }
     },
     enabled: !!id,
   });

@@ -5,7 +5,6 @@ import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
-import * as iam from "aws-cdk-lib/aws-iam";
 import * as rds from "aws-cdk-lib/aws-rds";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
@@ -21,6 +20,8 @@ interface ApiConstructProps {
   userPoolClientId: string;
   mediaBucket: s3.Bucket;
   resumeBucket: s3.Bucket;
+  /** CloudFront domain for the media/resume CDN (e.g. "https://abc.cloudfront.net"). Used to build public URLs for presigned uploads and to lock CORS origins. If omitted, CORS defaults to "*". */
+  cdnDomain?: string;
 }
 
 export class ApiConstruct extends Construct {
@@ -31,7 +32,7 @@ export class ApiConstruct extends Construct {
 
     const {
       dbSecret, dbProxy, vpc, lambdaSecurityGroup,
-      userPoolId, userPoolClientId, mediaBucket, resumeBucket,
+      userPoolId, userPoolClientId, mediaBucket, resumeBucket, cdnDomain,
     } = props;
 
     // Shared Lambda environment variables
@@ -96,13 +97,20 @@ export class ApiConstruct extends Construct {
     resendApiSecret.grantRead(submitContact);
 
     // ── Admin Lambda functions ─────────────────────────────────────────────
+    const me              = fn("Me",              "admin/me/index.ts");
     const getMessages     = fn("GetMessages",     "admin/get-messages/index.ts");
     const markMessageRead = fn("MarkMessageRead", "admin/mark-message-read/index.ts");
     const manageProfile   = fn("ManageProfile",   "admin/manage-profile/index.ts");
     const manageProjects  = fn("ManageProjects",  "admin/manage-projects/index.ts");
     const manageTimeline  = fn("ManageTimeline",  "admin/manage-timeline/index.ts");
 
-    const getUploadUrl = fn("GetUploadUrl", "admin/get-upload-url/index.ts");
+    // getUploadUrl only needs S3 access — no DB reads, so create it without the shared DB grants
+    const getUploadUrl = new lambdaNodejs.NodejsFunction(this, "GetUploadUrl", {
+      ...sharedLambdaConfig,
+      functionName: "portfolio-getuploadurl",
+      entry: path.join(lambdaDir, "admin/get-upload-url/index.ts"),
+      environment: { ...sharedEnv, ...(cdnDomain ? { CDN_URL: cdnDomain } : {}) },
+    });
     mediaBucket.grantPut(getUploadUrl);
     resumeBucket.grantPut(getUploadUrl);
     // Also grant delete for media cleanup
@@ -122,7 +130,7 @@ export class ApiConstruct extends Construct {
           apigatewayv2.CorsHttpMethod.DELETE,
           apigatewayv2.CorsHttpMethod.OPTIONS,
         ],
-        allowOrigins: ["*"], // lock to your domain after deployment
+        allowOrigins: cdnDomain ? [cdnDomain] : ["*"],
         maxAge: cdk.Duration.days(1),
       },
     });
@@ -144,6 +152,7 @@ export class ApiConstruct extends Construct {
     const intGetProjectMedia = new integrations.HttpLambdaIntegration("IntGetProjectMedia", getProjectMedia);
     const intGetTimeline     = new integrations.HttpLambdaIntegration("IntGetTimeline",     getTimeline);
     const intSubmitContact   = new integrations.HttpLambdaIntegration("IntSubmitContact",   submitContact);
+    const intMe              = new integrations.HttpLambdaIntegration("IntMe",              me);
     const intGetMessages     = new integrations.HttpLambdaIntegration("IntGetMessages",     getMessages);
     const intMarkMessageRead = new integrations.HttpLambdaIntegration("IntMarkMessageRead", markMessageRead);
     const intManageProfile   = new integrations.HttpLambdaIntegration("IntManageProfile",   manageProfile);
@@ -162,6 +171,7 @@ export class ApiConstruct extends Construct {
     // ── Admin routes (JWT required) ─────────────────────────────────────────
     const adminOpts = { authorizer: cognitoAuthorizer };
 
+    this.httpApi.addRoutes({ path: "/admin/me",                  methods: [apigatewayv2.HttpMethod.GET],                                     integration: intMe,              ...adminOpts });
     this.httpApi.addRoutes({ path: "/admin/messages",           methods: [apigatewayv2.HttpMethod.GET],                                     integration: intGetMessages,     ...adminOpts });
     this.httpApi.addRoutes({ path: "/admin/messages/{id}/read", methods: [apigatewayv2.HttpMethod.PUT],                                     integration: intMarkMessageRead, ...adminOpts });
     this.httpApi.addRoutes({ path: "/admin/profile",            methods: [apigatewayv2.HttpMethod.GET, apigatewayv2.HttpMethod.PUT],         integration: intManageProfile,   ...adminOpts });

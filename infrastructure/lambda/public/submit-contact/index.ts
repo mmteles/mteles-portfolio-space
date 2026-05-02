@@ -61,28 +61,28 @@ export const handler = async (
 
     const { name, email, subject, message } = body as Record<string, string>;
 
-    // Server-side rate limit: max 3 messages per email per 60 minutes
-    const rateLimitRows = await query<{ count: string }>(
-      `SELECT COUNT(*) AS count FROM contact_messages
-       WHERE email = $1 AND created_at > NOW() - INTERVAL '60 minutes'`,
-      [email.toLowerCase()]
+    // Atomic rate-limit + insert: a CTE counts recent messages and only inserts
+    // when the count is below the threshold, eliminating the TOCTOU race.
+    const inserted = await query<{ id: string }>(
+      `WITH recent AS (
+         SELECT COUNT(*) AS c FROM contact_messages
+         WHERE email = $1 AND created_at > NOW() - INTERVAL '60 minutes'
+       )
+       INSERT INTO contact_messages (name, email, subject, message)
+       SELECT $2, $1, $3, $4
+       WHERE (SELECT c FROM recent) < 3
+       RETURNING id`,
+      [email.trim().toLowerCase(), name.trim(), subject.trim(), message.trim()]
     );
-    if (parseInt(rateLimitRows[0]?.count ?? "0", 10) >= 3) {
+
+    if (!inserted[0]?.id) {
       return tooManyRequests("Too many messages from this email. Try again later.");
     }
-
-    // Insert into DB
-    const inserted = await query<{ id: string }>(
-      `INSERT INTO contact_messages (name, email, subject, message)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id`,
-      [name.trim(), email.trim().toLowerCase(), subject.trim(), message.trim()]
-    );
 
     // Send email notification (best-effort — don't fail the request if email fails)
     try {
       const apiKey = await getResendKey();
-      await fetch("https://api.resend.com/emails", {
+      const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -102,8 +102,12 @@ export const handler = async (
           `,
         }),
       });
+      if (!emailRes.ok) {
+        const errBody = await emailRes.text().catch(() => "");
+        console.warn(`Resend returned ${emailRes.status}: ${errBody}`);
+      }
     } catch (emailErr) {
-      console.warn("Email send failed (non-fatal):", emailErr);
+      console.warn("Email send failed (non-fatal):", emailErr instanceof Error ? emailErr.message : emailErr);
     }
 
     return ok({ id: inserted[0]?.id, message: "Message sent successfully" });

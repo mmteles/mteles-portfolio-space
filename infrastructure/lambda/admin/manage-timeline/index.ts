@@ -5,6 +5,7 @@
  * DELETE /admin/timeline/{id}       — delete entry
  */
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
+import { assertAdmin, getClaims } from "../../shared/auth";
 import { query } from "../../shared/db";
 import { ok, created, noContent, badRequest, notFound, serverError } from "../../shared/response";
 
@@ -15,6 +16,7 @@ export const handler = async (
   const id = event.pathParameters?.id;
 
   try {
+    assertAdmin(getClaims(event));
     if (method === "GET") {
       const rows = await query(`
         SELECT id, title, organization, start_date, end_date, description, entry_type, sort_order, created_at, updated_at

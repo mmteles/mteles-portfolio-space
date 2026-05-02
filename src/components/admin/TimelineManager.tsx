@@ -47,7 +47,13 @@ export default function TimelineManager() {
     try {
       const data = await authGet<any[]>("/admin/timeline");
       setEntries(data || []);
-    } catch { /* stay empty */ }
+    } catch (err: unknown) {
+      toast({
+        title: "Failed to load timeline entries",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   };
 
   const openNew = () => {

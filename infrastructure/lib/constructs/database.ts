@@ -13,7 +13,7 @@ export class DatabaseConstruct extends Construct {
   constructor(scope: Construct, id: string) {
     super(scope, id);
 
-    // VPC: 2 AZs, private subnets for DB, no NAT gateway (Lambda uses VPC endpoints)
+    // VPC: 2 AZs, 1 NAT gateway so Lambda in private subnet can reach Secrets Manager & SES
     this.vpc = new ec2.Vpc(this, "Vpc", {
       maxAzs: 2,
       natGateways: 1, // 1 NAT gateway so Lambda in private subnet can reach Secrets Manager & SES
@@ -36,24 +36,32 @@ export class DatabaseConstruct extends Construct {
       ],
     });
 
-    // Security group: RDS allows inbound 5432 only from Lambda SG
-    const dbSecurityGroup = new ec2.SecurityGroup(this, "DbSg", {
-      vpc: this.vpc,
-      description: "Allow PostgreSQL from Lambda",
-      allowAllOutbound: false,
-    });
-
+    // Three separate security groups: Lambda → Proxy → RDS
+    // Merging proxy + RDS into one SG with allowAllOutbound:false breaks the
+    // proxy's outbound TCP connection to port 5432, and a self-referencing
+    // ingress rule would let Lambda bypass the proxy entirely.
     this.lambdaSecurityGroup = new ec2.SecurityGroup(this, "LambdaSg", {
       vpc: this.vpc,
       description: "Lambda functions security group",
       allowAllOutbound: true,
     });
 
-    dbSecurityGroup.addIngressRule(
-      this.lambdaSecurityGroup,
-      ec2.Port.tcp(5432),
-      "Lambda to Postgres"
-    );
+    const proxySg = new ec2.SecurityGroup(this, "ProxySg", {
+      vpc: this.vpc,
+      description: "RDS Proxy security group",
+      allowAllOutbound: true,
+    });
+
+    const dbSecurityGroup = new ec2.SecurityGroup(this, "DbSg", {
+      vpc: this.vpc,
+      description: "RDS instance — only proxy may connect",
+      allowAllOutbound: false,
+    });
+
+    // Lambda → Proxy
+    proxySg.addIngressRule(this.lambdaSecurityGroup, ec2.Port.tcp(5432), "Lambda to Proxy");
+    // Proxy → RDS
+    dbSecurityGroup.addIngressRule(proxySg, ec2.Port.tcp(5432), "Proxy to RDS");
 
     // RDS PostgreSQL db.t4g.micro (cheapest ARM instance, ~$13/month)
     const dbInstance = new rds.DatabaseInstance(this, "Postgres", {
@@ -87,18 +95,15 @@ export class DatabaseConstruct extends Construct {
       secrets: [this.secret],
       vpc: this.vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-      securityGroups: [dbSecurityGroup],
+      securityGroups: [proxySg],
       requireTLS: true,
       iamAuth: false, // use password auth via Secrets Manager for simplicity
       idleClientTimeout: cdk.Duration.minutes(10),
       debugLogging: false,
     });
 
-    this.proxy.grantConnect(
-      new cdk.aws_iam.ArnPrincipal(
-        `arn:aws:iam::${cdk.Stack.of(this).account}:root`
-      )
-    );
+    // Per-function grants are applied in ApiConstruct (dbProxy.grantConnect(fn))
+    // so no account-root grant is needed here.
 
     new cdk.CfnOutput(this, "ProxyEndpoint", {
       value: this.proxy.endpoint,

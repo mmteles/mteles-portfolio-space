@@ -5,6 +5,7 @@
  * DELETE /admin/projects/{id}       — delete project + its media records
  */
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
+import { assertAdmin, getClaims } from "../../shared/auth";
 import { query, withTransaction } from "../../shared/db";
 import { ok, created, noContent, badRequest, notFound, serverError } from "../../shared/response";
 
@@ -15,6 +16,7 @@ export const handler = async (
   const id = event.pathParameters?.id;
 
   try {
+    assertAdmin(getClaims(event));
     // GET /admin/projects
     if (method === "GET" && !id) {
       const rows = await query(`
@@ -85,10 +87,15 @@ export const handler = async (
 
     // DELETE /admin/projects/{id}
     if (method === "DELETE") {
+      let deleted = false;
       await withTransaction(async (client) => {
         await client.query("DELETE FROM project_media WHERE project_id = $1", [id]);
-        await client.query("DELETE FROM projects WHERE id = $1", [id]);
+        const res = await client.query<{ id: string }>(
+          "DELETE FROM projects WHERE id = $1 RETURNING id", [id]
+        );
+        deleted = res.rowCount !== null && res.rowCount > 0;
       });
+      if (!deleted) return notFound("Project");
       return noContent();
     }
 

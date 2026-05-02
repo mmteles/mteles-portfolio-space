@@ -3,10 +3,12 @@ import { authGet, authPut } from "@/integrations/aws/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { Mail, Check } from "lucide-react";
 
 export default function MessagesManager() {
   const [messages, setMessages] = useState<any[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadMessages();
@@ -16,7 +18,13 @@ export default function MessagesManager() {
     try {
       const data = await authGet<any[]>("/admin/messages");
       setMessages(data || []);
-    } catch { /* stay empty */ }
+    } catch (err: unknown) {
+      toast({
+        title: "Failed to load messages",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   };
 
   const markAsRead = async (id: string) => {

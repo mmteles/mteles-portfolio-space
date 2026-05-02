@@ -43,6 +43,7 @@ export class PortfolioStack extends cdk.Stack {
       userPoolClientId: auth.userPoolClient.userPoolClientId,
       mediaBucket: storage.mediaBucket,
       resumeBucket: storage.resumeBucket,
+      cdnDomain: `https://${storage.distribution.distributionDomainName}`,
     });
 
     // ── Step 3: Frontend hosting on www.mteles.com ────────────────────────────

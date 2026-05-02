@@ -20,8 +20,13 @@ export function created(body: unknown) {
   return { statusCode: 201, headers: BASE_HEADERS, body: JSON.stringify(body) };
 }
 
+const NO_CONTENT_HEADERS: Headers = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type,Authorization",
+};
+
 export function noContent() {
-  return { statusCode: 204, headers: BASE_HEADERS, body: "" };
+  return { statusCode: 204, headers: NO_CONTENT_HEADERS };
 }
 
 export function badRequest(message: string) {
@@ -45,7 +50,13 @@ export function tooManyRequests(message = "Too many requests") {
 }
 
 export function serverError(err: unknown) {
-  console.error("Unhandled error:", err);
+  // assertAdmin throws a pre-formed HTTP response object — return it directly
+  if (typeof err === "object" && err !== null && "statusCode" in err && "body" in err) {
+    const res = err as { statusCode: number; body: string };
+    return { statusCode: res.statusCode, headers: BASE_HEADERS, body: res.body };
+  }
+  const hint = err instanceof Error ? err.message : typeof err;
+  console.error("Unhandled error:", hint);
   return {
     statusCode: 500,
     headers: BASE_HEADERS,

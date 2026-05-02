@@ -50,6 +50,12 @@ export class StorageConstruct extends Construct {
         },
       ],
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      lifecycleRules: [
+        {
+          id: "expire-multipart-uploads",
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
+        },
+      ],
     });
 
     // Origin Access Control for CloudFront → S3 (modern replacement for OAI)

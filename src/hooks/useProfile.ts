@@ -18,7 +18,6 @@ export function useProfile() {
     queryKey: ["profile"],
     queryFn: async () => {
       const data = await apiGet<Profile>("/profile");
-      if (!data) return null;
       return {
         ...data,
         hero_stats: (data.hero_stats as Array<{ label: string; value: string }>) || [],

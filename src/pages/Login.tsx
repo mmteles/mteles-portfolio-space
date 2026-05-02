@@ -163,7 +163,7 @@ export default function Login() {
                   Reset Password
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Enter your email and we'll send a reset link.
+                  Enter your email and we'll send a 6-digit reset code.
                 </p>
               </div>
 

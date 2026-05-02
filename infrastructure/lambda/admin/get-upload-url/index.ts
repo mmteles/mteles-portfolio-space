@@ -13,7 +13,7 @@ import { ok, badRequest, serverError } from "../../shared/response";
 import { randomUUID } from "crypto";
 
 const s3 = new S3Client({});
-const STORAGE_BASE_URL = process.env.CDN_URL ?? "";
+const CDN_URL = (process.env.CDN_URL ?? "").replace(/\/$/, "");
 
 const ALLOWED_BUCKETS: Record<string, string> = {
   "project-media": process.env.MEDIA_BUCKET!,
@@ -53,7 +53,8 @@ export const handler = async (
     });
 
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 }); // 5 minutes
-    const publicUrl = `${STORAGE_BASE_URL}/${bucket === "resume" ? "resume" : ""}/${key}`.replace(/\/+/g, "/").replace(":/", "://");
+    const prefix = bucket === "resume" ? "/resume/" : "/";
+    const publicUrl = `${CDN_URL}${prefix}${key}`.replace(/([^:])\/+/g, "$1/");
 
     return ok({ uploadUrl, publicUrl, key });
   } catch (err) {

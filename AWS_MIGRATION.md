@@ -52,7 +52,7 @@ npm install -g aws-cdk typescript ts-node
 
 # Configure AWS credentials
 aws configure
-# → Enter: Access Key ID, Secret Access Key, Region (us-east-1), output format (json)
+# → Enter: Access Key ID, Secret Access Key, Region (us-west-2), output format (json)
 
 # Verify
 aws sts get-caller-identity
@@ -68,7 +68,7 @@ aws sts get-caller-identity
 aws secretsmanager create-secret \
   --name "/portfolio/resend-api-key" \
   --secret-string "re_YOUR_RESEND_API_KEY_HERE" \
-  --region us-east-1
+  --region us-west-2
 ```
 
 ### 1.2 Install CDK dependencies and bootstrap
@@ -78,7 +78,7 @@ cd infrastructure
 npm install
 
 # Bootstrap CDK in your account/region (one-time per account)
-npx cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-1
+npx cdk bootstrap aws://YOUR_ACCOUNT_ID/us-west-2
 ```
 
 ### 1.3 Preview what will be created
@@ -99,8 +99,8 @@ Deployment takes ~10 minutes (RDS provisioning is the slowest step).
 **Save the outputs** — you'll need them for environment variables:
 
 ```
-MtelesPortfolioStack.ApiUrl            = https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com
-MtelesPortfolioStack.CognitoUserPoolId = us-east-1_XXXXXXXXX
+MtelesPortfolioStack.ApiUrl            = https://xxxxxxxxxx.execute-api.us-west-2.amazonaws.com
+MtelesPortfolioStack.CognitoUserPoolId = us-west-2_XXXXXXXXX
 MtelesPortfolioStack.CognitoClientId   = xxxxxxxxxxxxxxxxxxxxxxxxxx
 MtelesPortfolioStack.MediaCdnUrl       = https://dXXXXXXXXXXXX.cloudfront.net
 MtelesPortfolioStack.DbSecretArn       = arn:aws:secretsmanager:...
@@ -170,26 +170,26 @@ psql -h YOUR_RDS_PROXY -U portfolio_admin -d portfolio \
 ```bash
 # Create user (replace with your email)
 aws cognito-idp admin-create-user \
-  --user-pool-id us-east-1_XXXXXXXXX \
-  --username mauricio.mteles@gmail.com \
-  --user-attributes Name=email,Value=mauricio.mteles@gmail.com Name=email_verified,Value=true \
+  --user-pool-id us-west-2_XXXXXXXXX \
+  --username <user_email> \
+  --user-attributes Name=email,Value=<user_email> Name=email_verified,Value=true \
   --temporary-password "Temp@Password123!" \
-  --region us-east-1
+  --region us-west-2
 
 # Set permanent password
 aws cognito-idp admin-set-user-password \
-  --user-pool-id us-east-1_XXXXXXXXX \
-  --username mauricio.mteles@gmail.com \
+  --user-pool-id us-west-2_XXXXXXXXX \
+  --username <user_email> \
   --password "YourSecurePassword123!" \
   --permanent \
-  --region us-east-1
+  --region us-west-2
 
 # Add to admin group
 aws cognito-idp admin-add-user-to-group \
-  --user-pool-id us-east-1_XXXXXXXXX \
-  --username mauricio.mteles@gmail.com \
+  --user-pool-id us-west-2_XXXXXXXXX \
+  --username <user_email> \
   --group-name admin \
-  --region us-east-1
+  --region us-west-2
 ```
 
 ---
@@ -271,8 +271,8 @@ Replace `.env` contents:
 # VITE_SUPABASE_PROJECT_ID=...
 
 # Add AWS vars
-VITE_API_URL=https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com
-VITE_COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
+VITE_API_URL=https://xxxxxxxxxx.execute-api.us-west-2.amazonaws.com
+VITE_COGNITO_USER_POOL_ID=us-west-2_XXXXXXXXX
 VITE_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 VITE_STORAGE_BASE_URL=https://dXXXXXXXXXXXX.cloudfront.net
 ```
@@ -523,7 +523,7 @@ import { forgotPassword, confirmPassword } from "@/integrations/aws/auth";
 ### 6.1 Test the API manually
 
 ```bash
-API_URL="https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com"
+API_URL="https://xxxxxxxxxx.execute-api.us-west-2.amazonaws.com"
 
 # Public endpoints
 curl "$API_URL/profile"

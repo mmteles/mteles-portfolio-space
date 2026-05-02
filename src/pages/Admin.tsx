@@ -4,7 +4,7 @@ import {
   LogOut, User, FolderOpen, Clock, FileText, MessageSquare, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { authGet } from "@/integrations/aws/client";
 import ProfileManager from "@/components/admin/ProfileManager";
 import ProjectsManager from "@/components/admin/ProjectsManager";
 import TimelineManager from "@/components/admin/TimelineManager";
@@ -29,11 +29,9 @@ export default function Admin() {
 
   // Refresh unread message count whenever the active tab changes
   useEffect(() => {
-    supabase
-      .from("contact_messages")
-      .select("id", { count: "exact", head: true })
-      .eq("is_read", false)
-      .then(({ count }) => setUnreadCount(count || 0));
+    authGet<Array<{ is_read: boolean }>>("/admin/messages")
+      .then((msgs) => setUnreadCount(msgs.filter((m) => !m.is_read).length))
+      .catch(() => { /* non-fatal */ });
   }, [activeTab]);
 
   const currentTab = tabs.find((t) => t.id === activeTab)!;

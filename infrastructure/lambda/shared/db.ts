@@ -41,7 +41,7 @@ export async function getPool(): Promise<Pool> {
     max: 5,          // RDS Proxy reuses connections; keep Lambda-side pool small
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 5_000,
-    ssl: { rejectUnauthorized: false }, // RDS Proxy uses self-signed cert
+    ssl: { rejectUnauthorized: true }, // Lambda runtime includes Amazon root CAs
   });
 
   return pool;
