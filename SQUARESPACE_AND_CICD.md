@@ -79,7 +79,7 @@ To also redirect the root (`mteles.com`) to `www`:
 
 | Type | Host | Data | TTL |
 |---|---|---|---|
-| CNAME | `api` | `xxxxxxxxxx.execute-api.us-east-1.amazonaws.com` | 3600 |
+| CNAME | `api` | `xxxxxxxxxx.execute-api.us-west-2.amazonaws.com` | 3600 |
 
 > Get the API Gateway domain from CDK output `ApiUrl`, stripping the `https://` prefix
 > and the path suffix (everything after `.amazonaws.com`).
@@ -150,7 +150,7 @@ Then update `VITE_API_URL` in your GitHub Secrets to `https://api.mteles.com`.
 | Type | Host | Points to | Purpose |
 |---|---|---|---|
 | CNAME | `www` | `dXXXX.cloudfront.net` | Frontend website |
-| CNAME | `api` | `d-xxxx.execute-api.us-east-1.amazonaws.com` | API Gateway |
+| CNAME | `api` | `d-xxxx.execute-api.us-west-2.amazonaws.com` | API Gateway |
 | CNAME | `_validation1` | `_xxxxx.acm-validations.aws.` | SSL cert validation |
 | Redirect | `mteles.com` | `https://www.mteles.com` | Root → www |
 

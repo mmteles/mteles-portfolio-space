@@ -20,11 +20,14 @@ interface DbSecret {
 }
 
 async function getSecret(): Promise<DbSecret> {
+  const secretArn = process.env.DB_SECRET_ARN;
+  if (!secretArn) throw new Error("DB_SECRET_ARN environment variable is not set");
   const client = new SecretsManagerClient({});
   const response = await client.send(
-    new GetSecretValueCommand({ SecretId: process.env.DB_SECRET_ARN! })
+    new GetSecretValueCommand({ SecretId: secretArn })
   );
-  return JSON.parse(response.SecretString!);
+  if (!response.SecretString) throw new Error("DB secret is not a string value");
+  return JSON.parse(response.SecretString);
 }
 
 export async function getPool(): Promise<Pool> {

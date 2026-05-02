@@ -16,10 +16,13 @@ let resendApiKey: string | null = null;
 
 async function getResendKey(): Promise<string> {
   if (resendApiKey) return resendApiKey;
+  const secretArn = process.env.RESEND_SECRET_ARN;
+  if (!secretArn) throw new Error("RESEND_SECRET_ARN environment variable is not set");
   const res = await smClient.send(
-    new GetSecretValueCommand({ SecretId: process.env.RESEND_SECRET_ARN! })
+    new GetSecretValueCommand({ SecretId: secretArn })
   );
-  resendApiKey = res.SecretString!;
+  if (!res.SecretString) throw new Error("Resend secret is not a string value");
+  resendApiKey = res.SecretString;
   return resendApiKey;
 }
 

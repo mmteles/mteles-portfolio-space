@@ -73,7 +73,10 @@ export async function getAdminStatus(): Promise<boolean> {
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
   const base64url = token.split(".")[1];
-  const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  const base64 = base64url
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(base64url.length + (4 - (base64url.length % 4)) % 4, "=");
   return JSON.parse(atob(base64));
 }
 

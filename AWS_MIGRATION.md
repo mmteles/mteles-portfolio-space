@@ -122,6 +122,9 @@ The RDS instance is in a private subnet with no public access. Connect via:
 psql -h YOUR_RDS_PROXY_ENDPOINT -U portfolio_admin -d portfolio
 
 # Paste schema.sql contents or use \i schema.sql
+
+# After migration is complete, terminate the bastion to avoid ongoing costs (~$3-5/month):
+# EC2 Console → Instances → Select instance → Instance State → Terminate
 ```
 
 **Option B — AWS Cloud Shell + SSM**

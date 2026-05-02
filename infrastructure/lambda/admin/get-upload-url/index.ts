@@ -9,15 +9,23 @@
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getClaims, assertAdmin } from "../../shared/auth";
 import { ok, badRequest, serverError } from "../../shared/response";
 import { randomUUID } from "crypto";
 
 const s3 = new S3Client({});
-const CDN_URL = (process.env.CDN_URL ?? "").replace(/\/$/, "");
+
+function requireEnv(name: string): string {
+  const val = process.env[name];
+  if (!val) throw new Error(`Missing required environment variable: ${name}`);
+  return val;
+}
+
+const CDN_URL = requireEnv("CDN_URL").replace(/\/$/, "");
 
 const ALLOWED_BUCKETS: Record<string, string> = {
-  "project-media": process.env.MEDIA_BUCKET!,
-  resume: process.env.RESUME_BUCKET!,
+  "project-media": requireEnv("MEDIA_BUCKET"),
+  resume: requireEnv("RESUME_BUCKET"),
 };
 
 const ALLOWED_TYPES: Record<string, string[]> = {
@@ -29,6 +37,7 @@ export const handler = async (
   event: APIGatewayProxyEventV2WithJWTAuthorizer
 ): Promise<APIGatewayProxyResultV2> => {
   try {
+    assertAdmin(getClaims(event));
     let body: { bucket?: string; filename?: string; contentType?: string };
     try { body = JSON.parse(event.body ?? "{}"); } catch { return badRequest("Invalid JSON"); }
 
@@ -41,10 +50,12 @@ export const handler = async (
     }
 
     const bucketName = ALLOWED_BUCKETS[bucket]!;
-    const ext = filename.split(".").pop() ?? "";
+    const dotIdx = filename.lastIndexOf(".");
+    const ext = dotIdx !== -1 ? filename.slice(dotIdx + 1).toLowerCase() : "";
+    const suffix = ext ? `.${ext}` : "";
     const key = bucket === "resume"
-      ? `resume-${Date.now()}.${ext}`
-      : `${randomUUID()}.${ext}`;
+      ? `resume-${Date.now()}${suffix}`
+      : `${randomUUID()}${suffix}`;
 
     const command = new PutObjectCommand({
       Bucket: bucketName,

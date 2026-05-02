@@ -50,6 +50,9 @@ export const handler = async (
       try { body = JSON.parse(event.body ?? "{}"); } catch { return badRequest("Invalid JSON"); }
 
       const { title, organization, start_date, end_date, description, entry_type, sort_order } = body as Record<string, unknown>;
+      if (entry_type !== undefined && !["work", "education"].includes(entry_type as string)) {
+        return badRequest("entry_type must be 'work' or 'education'");
+      }
       const rows = await query(`
         UPDATE timeline_entries SET
           title        = COALESCE($2, title),
