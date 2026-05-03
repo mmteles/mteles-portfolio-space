@@ -45,7 +45,6 @@ export class FrontendHostingConstruct extends Construct {
 
     // S3 bucket — no public access, served exclusively via CloudFront OAC
     this.bucket = new s3.Bucket(this, "FrontendBucket", {
-      bucketName: `portfolio-frontend-${cdk.Stack.of(this).account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       removalPolicy: cdk.RemovalPolicy.RETAIN,

@@ -10,5 +10,5 @@ new PortfolioStack(app, "MtelesPortfolioStack", {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION ?? "us-east-1",
   },
-  description: "mteles portfolio – API, DB, Auth, Storage",
+  description: "mteles portfolio - API, DB, Auth, Storage",
 });

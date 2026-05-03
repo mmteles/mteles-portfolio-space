@@ -15,7 +15,6 @@ export class StorageConstruct extends Construct {
     // Single bucket with prefixes: /project-media/ and /resume/
     // (mirrors the two Supabase storage buckets)
     this.mediaBucket = new s3.Bucket(this, "MediaBucket", {
-      bucketName: `portfolio-media-${cdk.Stack.of(this).account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL, // CloudFront OAC handles public access
       encryption: s3.BucketEncryption.S3_MANAGED,
       cors: [
@@ -38,7 +37,6 @@ export class StorageConstruct extends Construct {
 
     // Resume bucket is kept separate so permissions can differ
     this.resumeBucket = new s3.Bucket(this, "ResumeBucket", {
-      bucketName: `portfolio-resume-${cdk.Stack.of(this).account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       cors: [
