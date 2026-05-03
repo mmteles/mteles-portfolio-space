@@ -117,8 +117,8 @@ export class FrontendHostingConstruct extends Construct {
     new cdk.CfnOutput(this, "FrontendCdnDomain", {
       value: this.distribution.distributionDomainName,
       description: customDomain
-        ? `Add a CNAME record in Squarespace: ${customDomain} pointing to ${this.distribution.distributionDomainName}`
-        : "Frontend CloudFront domain",
+        ? "Squarespace DNS: add CNAME record — Host: www, Points To: see Value field above"
+        : "Frontend CloudFront domain (no custom domain configured)",
     });
 
     new cdk.CfnOutput(this, "FrontendDistributionId", {
