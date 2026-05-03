@@ -99,7 +99,7 @@ export class PortfolioStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "MediaCdnUrl", {
       value: `https://${storage.distribution.distributionDomainName}`,
-      description: "CloudFront media CDN URL — set as VITE_STORAGE_BASE_URL in GitHub Secrets",
+      description: "CloudFront media CDN URL - set as VITE_STORAGE_BASE_URL in GitHub Secrets",
     });
 
     new cdk.CfnOutput(this, "FrontendBucketName", {

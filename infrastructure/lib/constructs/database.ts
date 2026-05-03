@@ -54,7 +54,7 @@ export class DatabaseConstruct extends Construct {
 
     const dbSecurityGroup = new ec2.SecurityGroup(this, "DbSg", {
       vpc: this.vpc,
-      description: "RDS instance — only proxy may connect",
+      description: "RDS instance - only proxy may connect",
       allowAllOutbound: false,
     });
 

@@ -63,6 +63,8 @@ export class ApiConstruct extends Construct {
         // @aws-sdk/* is pre-installed in the Lambda Node.js 22 runtime.
         // pg-native is an optional native addon for pg — exclude it so pg uses its pure-JS fallback.
         externalModules: ["@aws-sdk/*", "pg-native"],
+        // Use local esbuild instead of Docker — avoids ARM64/x86 mismatch on CI runners.
+        forceDockerBundling: false,
       },
     };
 
