@@ -27,9 +27,23 @@ export function getClaims(
   const claims = event.requestContext.authorizer.jwt.claims;
 
   const rawGroups = claims["cognito:groups"] ?? "";
-  const groups = Array.isArray(rawGroups)
-    ? rawGroups
-    : String(rawGroups).split(",").map((g) => g.trim()).filter(Boolean);
+  let groups: string[];
+  if (Array.isArray(rawGroups)) {
+    groups = rawGroups as string[];
+  } else {
+    const str = String(rawGroups);
+    // API Gateway may serialize the JWT array claim as a JSON string e.g. '["admin"]'
+    if (str.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(str);
+        groups = Array.isArray(parsed) ? parsed.map(String) : str.split(",").map((g) => g.trim()).filter(Boolean);
+      } catch {
+        groups = str.split(",").map((g) => g.trim()).filter(Boolean);
+      }
+    } else {
+      groups = str.split(",").map((g) => g.trim()).filter(Boolean);
+    }
+  }
 
   return {
     sub: String(claims.sub ?? ""),
