@@ -1,29 +1,33 @@
 /**
  * POST /contact
- * Validates input, rate-limits by email, inserts into DB, sends email via Resend.
- * Consolidates the two separate Supabase calls from the current Contact.tsx.
+ * Validates input, rate-limits by email, inserts into DB, sends email via Gmail SMTP.
  */
 import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import {
   SecretsManagerClient,
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
+import nodemailer from "nodemailer";
 import { query } from "../../shared/db";
 import { ok, badRequest, tooManyRequests, serverError } from "../../shared/response";
 
 const smClient = new SecretsManagerClient({});
-let resendApiKey: string | null = null;
 
-async function getResendKey(): Promise<string> {
-  if (resendApiKey) return resendApiKey;
-  const secretArn = process.env.RESEND_SECRET_ARN;
-  if (!secretArn) throw new Error("RESEND_SECRET_ARN environment variable is not set");
-  const res = await smClient.send(
-    new GetSecretValueCommand({ SecretId: secretArn })
-  );
-  if (!res.SecretString) throw new Error("Resend secret is not a string value");
-  resendApiKey = res.SecretString;
-  return resendApiKey;
+interface GmailCredentials {
+  email: string;
+  appPassword: string;
+}
+
+let gmailCredentials: GmailCredentials | null = null;
+
+async function getGmailCredentials(): Promise<GmailCredentials> {
+  if (gmailCredentials) return gmailCredentials;
+  const secretArn = process.env.GMAIL_SECRET_ARN;
+  if (!secretArn) throw new Error("GMAIL_SECRET_ARN environment variable is not set");
+  const res = await smClient.send(new GetSecretValueCommand({ SecretId: secretArn }));
+  if (!res.SecretString) throw new Error("Gmail secret is not a string value");
+  gmailCredentials = JSON.parse(res.SecretString) as GmailCredentials;
+  return gmailCredentials;
 }
 
 function escape(str: string): string {
@@ -52,12 +56,7 @@ export const handler = async (
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> => {
   try {
-    // Validate required environment variables
-    const contactFromEmail = process.env.CONTACT_FROM_EMAIL;
     const contactToEmail = process.env.CONTACT_TO_EMAIL;
-    if (!contactFromEmail || contactFromEmail.trim() === "") {
-      return serverError(new Error("CONTACT_FROM_EMAIL environment variable is not set"));
-    }
     if (!contactToEmail || contactToEmail.trim() === "") {
       return serverError(new Error("CONTACT_TO_EMAIL environment variable is not set"));
     }
@@ -74,8 +73,7 @@ export const handler = async (
 
     const { name, email, subject, message } = body as Record<string, string>;
 
-    // Atomic rate-limit + insert: a CTE counts recent messages and only inserts
-    // when the count is below the threshold, eliminating the TOCTOU race.
+    // Atomic rate-limit + insert
     const inserted = await query<{ id: string }>(
       `WITH recent AS (
          SELECT COUNT(*) AS c FROM contact_messages
@@ -92,33 +90,29 @@ export const handler = async (
       return tooManyRequests("Too many messages from this email. Try again later.");
     }
 
-    // Send email notification (best-effort — don't fail the request if email fails)
+    // Send email via Gmail SMTP (best-effort — don't fail the request if email fails)
     try {
-      const apiKey = await getResendKey();
-      const emailRes = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: contactFromEmail,
-          to: [contactToEmail],
-          reply_to: email,
-          subject: `[Portfolio] ${escape(subject)}`,
-          html: `
-            <h2>New contact message</h2>
-            <p><strong>From:</strong> ${escape(name)} &lt;${escape(email)}&gt;</p>
-            <p><strong>Subject:</strong> ${escape(subject)}</p>
-            <hr />
-            <p>${escape(message).replace(/\n/g, "<br>")}</p>
-          `,
-        }),
+      const creds = await getGmailCredentials();
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: { user: creds.email, pass: creds.appPassword },
       });
-      if (!emailRes.ok) {
-        const errBody = await emailRes.text().catch(() => "");
-        console.warn(`Resend returned ${emailRes.status}: ${errBody}`);
-      }
+
+      await transporter.sendMail({
+        from: `"Portfolio Contact" <${creds.email}>`,
+        to: contactToEmail,
+        replyTo: email.trim(),
+        subject: `[Portfolio] ${escape(subject.trim()).slice(0, 200)}`,
+        html: `
+          <h2>New contact message</h2>
+          <p><strong>From:</strong> ${escape(name.trim())} &lt;${escape(email.trim())}&gt;</p>
+          <p><strong>Subject:</strong> ${escape(subject.trim())}</p>
+          <hr />
+          <p>${escape(message.trim()).replace(/\n/g, "<br>")}</p>
+        `,
+      });
     } catch (emailErr) {
       console.warn("Email send failed (non-fatal):", emailErr instanceof Error ? emailErr.message : emailErr);
     }

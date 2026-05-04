@@ -92,13 +92,14 @@ export class ApiConstruct extends Construct {
     const getProjectMedia = fn("GetProjectMedia", "public/get-project-media/index.ts");
     const getTimeline     = fn("GetTimeline",     "public/get-timeline/index.ts");
 
-    const resendApiSecret = secretsmanager.Secret.fromSecretNameV2(
-      this, "ResendSecret", "/portfolio/resend-api-key"
+    const gmailSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, "GmailSecret", "/portfolio/gmail-credentials"
     );
     const submitContact = fn("SubmitContact", "public/submit-contact/index.ts", {
-      RESEND_SECRET_ARN: resendApiSecret.secretArn,
+      GMAIL_SECRET_ARN: gmailSecret.secretArn,
+      CONTACT_TO_EMAIL: "mteles@mteles.com",
     });
-    resendApiSecret.grantRead(submitContact);
+    gmailSecret.grantRead(submitContact);
 
     // ── Admin Lambda functions ─────────────────────────────────────────────
     const me              = fn("Me",              "admin/me/index.ts");
