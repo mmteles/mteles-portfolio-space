@@ -22,6 +22,8 @@ interface ApiConstructProps {
   resumeBucket: s3.Bucket;
   /** CloudFront domain for the media/resume CDN (e.g. "https://abc.cloudfront.net"). Used to build public URLs for presigned uploads and to lock CORS origins. If omitted, CORS defaults to "*". */
   cdnDomain?: string;
+  /** Additional origins to allow in CORS (e.g. the frontend CloudFront domain). */
+  corsOrigins?: string[];
 }
 
 export class ApiConstruct extends Construct {
@@ -32,7 +34,7 @@ export class ApiConstruct extends Construct {
 
     const {
       dbSecret, dbProxy, vpc, lambdaSecurityGroup,
-      userPoolId, userPoolClientId, mediaBucket, resumeBucket, cdnDomain,
+      userPoolId, userPoolClientId, mediaBucket, resumeBucket, cdnDomain, corsOrigins = [],
     } = props;
 
     // Shared Lambda environment variables
@@ -132,7 +134,7 @@ export class ApiConstruct extends Construct {
           apigatewayv2.CorsHttpMethod.DELETE,
           apigatewayv2.CorsHttpMethod.OPTIONS,
         ],
-        allowOrigins: cdnDomain ? [cdnDomain] : ["*"],
+        allowOrigins: cdnDomain ? [cdnDomain, ...corsOrigins] : ["*"],
         maxAge: cdk.Duration.days(1),
       },
     });
