@@ -54,7 +54,11 @@ jobs:
       # ── CDK diff (shows what will change — logged for review) ────────────────
       - name: CDK Diff
         working-directory: infrastructure
-        run: npx cdk diff MtelesPortfolioStack 2>&1 || true  # non-fatal
+        run: |
+          npx cdk diff MtelesPortfolioStack \
+            --context cloudfrontCertArn=${{ secrets.CLOUDFRONT_CERT_ARN }} \
+            --context apiCertArn=${{ secrets.API_CERT_ARN }} \
+            2>&1 || true  # non-fatal
 
       # ── CDK Deploy ───────────────────────────────────────────────────────────
       - name: CDK Deploy
@@ -63,7 +67,9 @@ jobs:
           npx cdk deploy MtelesPortfolioStack \
             --require-approval never \
             --outputs-file cdk-outputs.json \
-            --ci
+            --ci \
+            --context cloudfrontCertArn=${{ secrets.CLOUDFRONT_CERT_ARN }} \
+            --context apiCertArn=${{ secrets.API_CERT_ARN }}
 
       # ── Upload CDK outputs as artifact ───────────────────────────────────────
       - name: Upload CDK outputs
