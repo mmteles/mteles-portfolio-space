@@ -33,6 +33,12 @@ export class PortfolioStack extends cdk.Stack {
     // ── Storage (project-media + resume) ─────────────────────────────────────
     const storage = new StorageConstruct(this, "Storage");
 
+    // ── Step 3: Frontend hosting on www.mauriciomteles.com ───────────────────
+    const frontend = new FrontendHostingConstruct(this, "Frontend", {
+      customDomain: "www.mauriciomteles.com",
+      certificateArn: cloudfrontCertArn,
+    });
+
     // ── API (Lambda + API Gateway) ────────────────────────────────────────────
     const api = new ApiConstruct(this, "Api", {
       dbSecret: db.secret,
@@ -44,12 +50,10 @@ export class PortfolioStack extends cdk.Stack {
       mediaBucket: storage.mediaBucket,
       resumeBucket: storage.resumeBucket,
       cdnDomain: `https://${storage.distribution.distributionDomainName}`,
-    });
-
-    // ── Step 3: Frontend hosting on www.mteles.com ────────────────────────────
-    const frontend = new FrontendHostingConstruct(this, "Frontend", {
-      customDomain: "www.mteles.com",
-      certificateArn: cloudfrontCertArn,
+      corsOrigins: [
+        `https://${frontend.distribution.distributionDomainName}`,
+        "https://www.mauriciomteles.com",
+      ],
     });
 
     // ── Step 4: API Gateway custom domain → api.mteles.com ───────────────────
