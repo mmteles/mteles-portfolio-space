@@ -33,9 +33,9 @@ export class PortfolioStack extends cdk.Stack {
     // ── Storage (project-media + resume) ─────────────────────────────────────
     const storage = new StorageConstruct(this, "Storage");
 
-    // ── Step 3: Frontend hosting on www.mauriciomteles.com ───────────────────
+    // ── Step 3: Frontend hosting on www.mteles.com ───────────────────────────
     const frontend = new FrontendHostingConstruct(this, "Frontend", {
-      customDomain: "www.mauriciomteles.com",
+      customDomain: "www.mteles.com",
       certificateArn: cloudfrontCertArn,
     });
 
@@ -52,7 +52,7 @@ export class PortfolioStack extends cdk.Stack {
       cdnDomain: `https://${storage.distribution.distributionDomainName}`,
       corsOrigins: [
         `https://${frontend.distribution.distributionDomainName}`,
-        "https://www.mauriciomteles.com",
+        "https://www.mteles.com",
       ],
     });
 
