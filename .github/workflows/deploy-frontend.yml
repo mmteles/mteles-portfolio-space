@@ -83,10 +83,6 @@ jobs:
         run: |
           aws s3 cp dist/index.html s3://${{ secrets.AWS_FRONTEND_BUCKET }}/index.html \
             --cache-control "no-cache, no-store, must-revalidate"
-          for f in dist/*.json; do
-            [ -f "$f" ] && aws s3 cp "$f" s3://${{ secrets.AWS_FRONTEND_BUCKET }}/$(basename "$f") \
-              --cache-control "no-cache, no-store, must-revalidate"
-          done
 
       # ── Invalidate CloudFront ────────────────────────────────────────────────
       - name: Invalidate CloudFront cache
