@@ -5,9 +5,6 @@
  * and expiry before the Lambda is invoked. This module provides:
  *   1. A typed helper to extract claims from the verified token.
  *   2. An admin group check (cognito:groups must contain "admin").
- *
- * If you need to call admin Lambdas directly (e.g. via SAM local), you can
- * set SKIP_AUTH=true in the environment for local development only.
  */
 import { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
 
@@ -18,38 +15,55 @@ export interface TokenClaims {
 }
 
 /**
+ * Decode the JWT payload from the Authorization header without re-verifying
+ * the signature (API Gateway already verified it). API Gateway HTTP API JWT
+ * authorizers do not reliably pass claims whose names contain colons
+ * (e.g. "cognito:groups"), so we read directly from the token.
+ */
+function decodeJwtPayload(event: APIGatewayProxyEventV2WithJWTAuthorizer): Record<string, unknown> | null {
+  const authHeader = event.headers?.["authorization"] ?? event.headers?.["Authorization"] ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) return null;
+  try {
+    const base64url = token.split(".")[1];
+    const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(Buffer.from(base64, "base64").toString("utf8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function parseGroups(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (!raw) return [];
+  const str = String(raw);
+  if (str.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch { /* fall through */ }
+  }
+  return str.split(",").map((g) => g.trim()).filter(Boolean);
+}
+
+/**
  * Extract and return verified claims from the event.
- * API Gateway already verified the JWT before this Lambda is invoked.
+ * Reads from the decoded JWT payload directly; falls back to API GW claims.
  */
 export function getClaims(
   event: APIGatewayProxyEventV2WithJWTAuthorizer
 ): TokenClaims {
-  const claims = event.requestContext.authorizer.jwt.claims;
+  const payload = decodeJwtPayload(event);
+  const gwClaims = event.requestContext.authorizer.jwt.claims;
 
-  const rawGroups = claims["cognito:groups"] ?? "";
-  let groups: string[];
-  if (Array.isArray(rawGroups)) {
-    groups = rawGroups as string[];
-  } else {
-    const str = String(rawGroups);
-    // API Gateway may serialize the JWT array claim as a JSON string e.g. '["admin"]'
-    if (str.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(str);
-        groups = Array.isArray(parsed) ? parsed.map(String) : str.split(",").map((g) => g.trim()).filter(Boolean);
-      } catch {
-        groups = str.split(",").map((g) => g.trim()).filter(Boolean);
-      }
-    } else {
-      groups = str.split(",").map((g) => g.trim()).filter(Boolean);
-    }
-  }
+  const sub   = String(payload?.sub   ?? gwClaims.sub   ?? "");
+  const email = String(payload?.email ?? gwClaims.email ?? "");
+  // "cognito:groups" with a colon is unreliable in API GW claim mapping — read from JWT directly
+  const groups = parseGroups(payload?.["cognito:groups"] ?? gwClaims["cognito:groups"]);
 
-  return {
-    sub: String(claims.sub ?? ""),
-    email: String(claims.email ?? ""),
-    groups,
-  };
+  console.log("auth groups:", JSON.stringify(groups));
+
+  return { sub, email, groups };
 }
 
 /**
