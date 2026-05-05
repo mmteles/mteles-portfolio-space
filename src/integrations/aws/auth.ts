@@ -55,22 +55,6 @@ export function confirmNewPassword(email: string, code: string, newPassword: str
   });
 }
 
-export async function getAdminStatus(): Promise<boolean> {
-  const token = await getCognitoToken();
-  if (!token) return false;
-  try {
-    const apiUrl = ((import.meta.env.VITE_API_URL as string) ?? "").replace(/\/$/, "");
-    const res = await fetch(`${apiUrl}/admin/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return false;
-    const data = await res.json() as { isAdmin: boolean };
-    return data.isAdmin === true;
-  } catch {
-    return false;
-  }
-}
-
 function decodeJwtPayload(token: string): Record<string, unknown> {
   const base64url = token.split(".")[1];
   const base64 = base64url
@@ -78,6 +62,24 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
     .replace(/_/g, "/")
     .padEnd(base64url.length + (4 - (base64url.length % 4)) % 4, "=");
   return JSON.parse(atob(base64));
+}
+
+export function isAdminToken(token: string): boolean {
+  try {
+    const payload = decodeJwtPayload(token);
+    const groups = payload["cognito:groups"];
+    if (Array.isArray(groups)) return groups.includes("admin");
+    if (typeof groups === "string") {
+      if (groups.startsWith("[")) {
+        const parsed = JSON.parse(groups) as unknown;
+        return Array.isArray(parsed) && (parsed as string[]).includes("admin");
+      }
+      return groups.split(",").map((g) => g.trim()).includes("admin");
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 export function getUserFromToken(token: string | null): { id: string; email: string } | null {
