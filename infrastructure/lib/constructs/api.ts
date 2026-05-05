@@ -11,6 +11,7 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as kms from "aws-cdk-lib/aws-kms";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -98,6 +99,7 @@ export class ApiConstruct extends Construct {
     // SNS topic decouples the in-VPC submit-contact Lambda from the email sender
     const contactTopic = new sns.Topic(this, "ContactTopic", {
       topicName: "portfolio-contact-notifications",
+      masterKey: kms.Alias.fromAliasName(this, "ContactTopicKey", "alias/aws/sns"),
     });
 
     const submitContact = fn("SubmitContact", "public/submit-contact/index.ts", {

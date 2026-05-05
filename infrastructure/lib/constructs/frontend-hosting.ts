@@ -54,10 +54,12 @@ export class FrontendHostingConstruct extends Construct {
       description: "Portfolio frontend OAC",
     });
 
-    // Certificate (only if custom domains are provided)
+    // Certificate (only if custom domains AND a cert ARN are both present)
+    const hasCustomDomains = Boolean(customDomains?.length && certificateArn);
+
     const certificate =
-      customDomains?.length && certificateArn
-        ? acm.Certificate.fromCertificateArn(this, "Cert", certificateArn)
+      hasCustomDomains
+        ? acm.Certificate.fromCertificateArn(this, "Cert", certificateArn!)
         : undefined;
 
     // CloudFront distribution
@@ -87,7 +89,7 @@ export class FrontendHostingConstruct extends Construct {
         },
       ],
       defaultRootObject: "index.html",
-      domainNames: customDomains?.length ? customDomains : undefined,
+      domainNames: hasCustomDomains ? customDomains : undefined,
       certificate,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     });

@@ -21,8 +21,7 @@ export const handler = async (event: SNSEvent): Promise<void> => {
   const fromEmail = process.env.CONTACT_FROM_EMAIL;
 
   if (!toEmail || !fromEmail) {
-    console.error("CONTACT_TO_EMAIL or CONTACT_FROM_EMAIL not set");
-    return;
+    throw new Error("CONTACT_TO_EMAIL or CONTACT_FROM_EMAIL not set");
   }
 
   for (const record of event.Records) {
@@ -64,6 +63,7 @@ export const handler = async (event: SNSEvent): Promise<void> => {
       console.log(`Email sent for contact message ${payload.messageId}`);
     } catch (err) {
       console.error("Failed to send email for SNS record:", err);
+      throw err;
     }
   }
 };

@@ -56,6 +56,14 @@ export class DatabaseConstruct extends Construct {
       subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
     });
 
+    // SNS interface endpoint — allows submit-contact Lambda (PRIVATE_ISOLATED) to publish without NAT
+    this.vpc.addInterfaceEndpoint("SnsEndpoint", {
+      service: ec2.InterfaceVpcEndpointAwsService.SNS,
+      privateDnsEnabled: true,
+      securityGroups: [endpointSg],
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+    });
+
     // Three separate security groups: Lambda → Proxy → RDS
     // Merging proxy + RDS into one SG with allowAllOutbound:false breaks the
     // proxy's outbound TCP connection to port 5432, and a self-referencing
