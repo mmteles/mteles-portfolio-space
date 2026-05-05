@@ -227,7 +227,7 @@ export default function Login() {
               <p className="text-sm text-muted-foreground mb-6">
                 A 6-digit reset code has been sent to{" "}
                 <span className="font-medium text-foreground">{email}</span>.
-                Enter the code below to set your new password.
+                Click below to enter your code and set a new password.
               </p>
               <Button
                 className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white mb-3"
