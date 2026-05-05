@@ -93,11 +93,34 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- tag_groups: user-defined groupings for the project filter UI.
+-- tags[] contains tag strings that belong to this group; order matters for display.
+-- Tags used by projects but absent from every group are shown as "Other" on the frontend.
+CREATE TABLE IF NOT EXISTS public.tag_groups (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL UNIQUE,
+  sort_order INTEGER     NOT NULL DEFAULT 0,
+  tags       TEXT[]      NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Seed the default groups (idempotent — skipped if name already exists)
+INSERT INTO public.tag_groups (name, sort_order, tags) VALUES
+  ('AI & ML',             0, ARRAY['AI','ML','Machine Learning','LLM','GPT','RAG','OpenAI','Langchain','LangChain','NLP','Computer Vision','Deep Learning','TensorFlow','PyTorch','Anthropic','Claude','Embedding','Vector','Generative AI','Prompt Engineering','Hugging Face','Stable Diffusion','ChatGPT']),
+  ('Web & Frontend',      1, ARRAY['React','TypeScript','JavaScript','Vue','Angular','Next.js','Tailwind','CSS','HTML','Vite','Svelte','shadcn','Framer Motion','Three.js','WebGL']),
+  ('Backend & APIs',      2, ARRAY['Node.js','Python','FastAPI','Django','Flask','Express','REST','GraphQL','API','Supabase','Firebase','tRPC','WebSocket','gRPC']),
+  ('Cloud & DevOps',      3, ARRAY['AWS','Azure','GCP','Docker','Kubernetes','CI/CD','Terraform','Cloud','Serverless','GitHub Actions','Vercel','Netlify','Railway']),
+  ('Data & Analytics',    4, ARRAY['PostgreSQL','MongoDB','Redis','MySQL','SQLite','Analytics','Power BI','Tableau','ETL','Pandas','NumPy','Databricks','Snowflake']),
+  ('Business & Strategy', 5, ARRAY['Project Management','Consulting','Strategy','Finance','Healthcare','Agile','Scrum','PMO','Digital Transformation','Process Improvement'])
+ON CONFLICT (name) DO NOTHING;
+
 -- ---------------------------------------------------------------------------
 -- INDEXES
 -- ---------------------------------------------------------------------------
 
 CREATE INDEX IF NOT EXISTS idx_projects_published_sort   ON public.projects (published, sort_order);
+CREATE INDEX IF NOT EXISTS idx_tag_groups_sort           ON public.tag_groups (sort_order);
 CREATE INDEX IF NOT EXISTS idx_project_media_project_id  ON public.project_media (project_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_timeline_sort             ON public.timeline_entries (sort_order, start_date DESC);
 CREATE INDEX IF NOT EXISTS idx_contact_email_created     ON public.contact_messages (email, created_at);
@@ -132,6 +155,13 @@ END $$;
 DO $$ BEGIN
   CREATE TRIGGER trg_timeline_updated_at
     BEFORE UPDATE ON public.timeline_entries
+    FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TRIGGER trg_tag_groups_updated_at
+    BEFORE UPDATE ON public.tag_groups
     FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;

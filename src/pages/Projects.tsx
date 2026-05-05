@@ -4,50 +4,13 @@ import Layout from "@/components/layout/Layout";
 import ProjectCard, { type ViewMode } from "@/components/projects/ProjectCard";
 import { Input } from "@/components/ui/input";
 import { useProjects } from "@/hooks/useProjects";
+import { useTagGroups } from "@/hooks/useTagGroups";
 import { cn } from "@/lib/utils";
-
-// ─── Tag grouping ─────────────────────────────────────────────────────────────
-const TAG_GROUPS: Record<string, string[]> = {
-  "AI & ML": [
-    "AI", "ML", "Machine Learning", "LLM", "GPT", "RAG", "OpenAI", "Langchain",
-    "LangChain", "NLP", "Computer Vision", "Deep Learning", "TensorFlow", "PyTorch",
-    "Anthropic", "Claude", "Embedding", "Vector", "Generative AI", "Prompt Engineering",
-    "Hugging Face", "Stable Diffusion", "ChatGPT",
-  ],
-  "Web & Frontend": [
-    "React", "TypeScript", "JavaScript", "Vue", "Angular", "Next.js", "Tailwind",
-    "CSS", "HTML", "Vite", "Svelte", "shadcn", "Framer Motion", "Three.js", "WebGL",
-  ],
-  "Backend & APIs": [
-    "Node.js", "Python", "FastAPI", "Django", "Flask", "Express", "REST", "GraphQL",
-    "API", "Supabase", "Firebase", "tRPC", "WebSocket", "gRPC",
-  ],
-  "Cloud & DevOps": [
-    "AWS", "Azure", "GCP", "Docker", "Kubernetes", "CI/CD", "Terraform", "Cloud",
-    "Serverless", "GitHub Actions", "Vercel", "Netlify", "Railway",
-  ],
-  "Data & Analytics": [
-    "PostgreSQL", "MongoDB", "Redis", "MySQL", "SQLite", "Analytics", "Power BI",
-    "Tableau", "ETL", "Pandas", "NumPy", "Databricks", "Snowflake",
-  ],
-  "Business & Strategy": [
-    "Project Management", "Consulting", "Strategy", "Finance", "Healthcare",
-    "Agile", "Scrum", "PMO", "Digital Transformation", "Process Improvement",
-  ],
-};
-
-function getTagGroup(tag: string): string {
-  for (const [group, tags] of Object.entries(TAG_GROUPS)) {
-    if (tags.some((t) => t.toLowerCase() === tag.toLowerCase())) return group;
-  }
-  return "Other";
-}
-
-const GROUP_ORDER = [...Object.keys(TAG_GROUPS), "Other"];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Projects() {
   const { data: projects = [], isLoading } = useProjects();
+  const { data: tagGroups = [] } = useTagGroups();
   const [search, setSearch] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -59,25 +22,40 @@ export default function Projects() {
     localStorage.setItem("projectViewMode", mode);
   };
 
-  // All unique tags from projects
+  // All unique tags actually used by projects
   const allTags = useMemo(() => {
     const tags = new Set<string>();
     projects.forEach((p) => p.tags.forEach((t) => tags.add(t)));
-    return Array.from(tags).sort();
+    return Array.from(tags);
   }, [projects]);
 
-  // Tags organised into groups (only groups that have at least one tag)
+  // Build a lookup: tag (lowercase) → group name, based on DB groups
+  const tagToGroup = useMemo(() => {
+    const map = new Map<string, string>();
+    tagGroups.forEach((g) => {
+      g.tags.forEach((t) => map.set(t.toLowerCase(), g.name));
+    });
+    return map;
+  }, [tagGroups]);
+
+  // Tags organised into groups (only groups that have at least one tag in use)
   const groupedTags = useMemo(() => {
-    const groups: Record<string, string[]> = {};
+    const groups = new Map<string, string[]>();
+
+    // Insert groups in sort_order so iteration order is correct
+    tagGroups.forEach((g) => groups.set(g.name, []));
+    groups.set("Other", []);
+
     allTags.forEach((tag) => {
-      const group = getTagGroup(tag);
-      if (!groups[group]) groups[group] = [];
-      groups[group].push(tag);
+      const groupName = tagToGroup.get(tag.toLowerCase()) ?? "Other";
+      const bucket = groups.get(groupName);
+      if (bucket) bucket.push(tag);
+      else groups.set(groupName, [tag]);
     });
-    return Object.entries(groups).sort(([a], [b]) => {
-      return GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b);
-    });
-  }, [allTags]);
+
+    // Remove empty groups (including an empty "Other")
+    return Array.from(groups.entries()).filter(([, tags]) => tags.length > 0);
+  }, [allTags, tagGroups, tagToGroup]);
 
   const filtered = useMemo(() => {
     return projects.filter((p) => {

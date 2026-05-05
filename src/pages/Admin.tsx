@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
-  LogOut, User, FolderOpen, Clock, FileText, MessageSquare, ExternalLink,
+  LogOut, User, FolderOpen, Clock, FileText, MessageSquare, ExternalLink, Tag,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { authGet } from "@/integrations/aws/client";
@@ -10,6 +10,7 @@ import ProjectsManager from "@/components/admin/ProjectsManager";
 import TimelineManager from "@/components/admin/TimelineManager";
 import ResumeManager from "@/components/admin/ResumeManager";
 import MessagesManager from "@/components/admin/MessagesManager";
+import TagsManager from "@/components/admin/TagsManager";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -18,6 +19,7 @@ const tabs = [
   { id: "timeline",  label: "Timeline",  icon: Clock,         desc: "Work & education history" },
   { id: "resume",    label: "Resume",    icon: FileText,      desc: "Upload resume PDF" },
   { id: "messages",  label: "Messages",  icon: MessageSquare, desc: "Contact form submissions" },
+  { id: "tags",      label: "Tags",      icon: Tag,           desc: "Manage tag groups for project filters" },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
@@ -168,6 +170,7 @@ export default function Admin() {
             {activeTab === "timeline" && <TimelineManager />}
             {activeTab === "resume"   && <ResumeManager />}
             {activeTab === "messages" && <MessagesManager />}
+            {activeTab === "tags"     && <TagsManager />}
           </div>
         </main>
       </div>

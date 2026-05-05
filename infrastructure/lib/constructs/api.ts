@@ -95,6 +95,7 @@ export class ApiConstruct extends Construct {
     const getProject      = fn("GetProject",      "public/get-project/index.ts");
     const getProjectMedia = fn("GetProjectMedia", "public/get-project-media/index.ts");
     const getTimeline     = fn("GetTimeline",     "public/get-timeline/index.ts");
+    const getTagGroups    = fn("GetTagGroups",    "public/get-tag-groups/index.ts");
 
     // SNS topic decouples the in-VPC submit-contact Lambda from the email sender
     const contactTopic = new sns.Topic(this, "ContactTopic", {
@@ -133,12 +134,13 @@ export class ApiConstruct extends Construct {
     );
 
     // ── Admin Lambda functions ─────────────────────────────────────────────
-    const me              = fn("Me",              "admin/me/index.ts");
-    const getMessages     = fn("GetMessages",     "admin/get-messages/index.ts");
-    const markMessageRead = fn("MarkMessageRead", "admin/mark-message-read/index.ts");
-    const manageProfile   = fn("ManageProfile",   "admin/manage-profile/index.ts");
-    const manageProjects  = fn("ManageProjects",  "admin/manage-projects/index.ts");
-    const manageTimeline  = fn("ManageTimeline",  "admin/manage-timeline/index.ts");
+    const me               = fn("Me",               "admin/me/index.ts");
+    const getMessages      = fn("GetMessages",      "admin/get-messages/index.ts");
+    const markMessageRead  = fn("MarkMessageRead",  "admin/mark-message-read/index.ts");
+    const manageProfile    = fn("ManageProfile",    "admin/manage-profile/index.ts");
+    const manageProjects   = fn("ManageProjects",   "admin/manage-projects/index.ts");
+    const manageTimeline   = fn("ManageTimeline",   "admin/manage-timeline/index.ts");
+    const manageTagGroups  = fn("ManageTagGroups",  "admin/manage-tag-groups/index.ts");
 
     // getUploadUrl only needs S3 access — no DB reads, so create it without the shared DB grants
     const getUploadUrl = new lambdaNodejs.NodejsFunction(this, "GetUploadUrl", {
@@ -182,19 +184,21 @@ export class ApiConstruct extends Construct {
     );
 
     // Create one named integration per Lambda function (CDK requires non-empty IDs)
-    const intGetProfile      = new integrations.HttpLambdaIntegration("IntGetProfile",      getProfile);
-    const intGetProjects     = new integrations.HttpLambdaIntegration("IntGetProjects",     getProjects);
-    const intGetProject      = new integrations.HttpLambdaIntegration("IntGetProject",      getProject);
-    const intGetProjectMedia = new integrations.HttpLambdaIntegration("IntGetProjectMedia", getProjectMedia);
-    const intGetTimeline     = new integrations.HttpLambdaIntegration("IntGetTimeline",     getTimeline);
-    const intSubmitContact   = new integrations.HttpLambdaIntegration("IntSubmitContact",   submitContact);
-    const intMe              = new integrations.HttpLambdaIntegration("IntMe",              me);
-    const intGetMessages     = new integrations.HttpLambdaIntegration("IntGetMessages",     getMessages);
-    const intMarkMessageRead = new integrations.HttpLambdaIntegration("IntMarkMessageRead", markMessageRead);
-    const intManageProfile   = new integrations.HttpLambdaIntegration("IntManageProfile",   manageProfile);
-    const intManageProjects  = new integrations.HttpLambdaIntegration("IntManageProjects",  manageProjects);
-    const intManageTimeline  = new integrations.HttpLambdaIntegration("IntManageTimeline",  manageTimeline);
-    const intGetUploadUrl    = new integrations.HttpLambdaIntegration("IntGetUploadUrl",    getUploadUrl);
+    const intGetProfile       = new integrations.HttpLambdaIntegration("IntGetProfile",       getProfile);
+    const intGetProjects      = new integrations.HttpLambdaIntegration("IntGetProjects",      getProjects);
+    const intGetProject       = new integrations.HttpLambdaIntegration("IntGetProject",       getProject);
+    const intGetProjectMedia  = new integrations.HttpLambdaIntegration("IntGetProjectMedia",  getProjectMedia);
+    const intGetTimeline      = new integrations.HttpLambdaIntegration("IntGetTimeline",      getTimeline);
+    const intGetTagGroups     = new integrations.HttpLambdaIntegration("IntGetTagGroups",     getTagGroups);
+    const intSubmitContact    = new integrations.HttpLambdaIntegration("IntSubmitContact",    submitContact);
+    const intMe               = new integrations.HttpLambdaIntegration("IntMe",               me);
+    const intGetMessages      = new integrations.HttpLambdaIntegration("IntGetMessages",      getMessages);
+    const intMarkMessageRead  = new integrations.HttpLambdaIntegration("IntMarkMessageRead",  markMessageRead);
+    const intManageProfile    = new integrations.HttpLambdaIntegration("IntManageProfile",    manageProfile);
+    const intManageProjects   = new integrations.HttpLambdaIntegration("IntManageProjects",   manageProjects);
+    const intManageTimeline   = new integrations.HttpLambdaIntegration("IntManageTimeline",   manageTimeline);
+    const intManageTagGroups  = new integrations.HttpLambdaIntegration("IntManageTagGroups",  manageTagGroups);
+    const intGetUploadUrl     = new integrations.HttpLambdaIntegration("IntGetUploadUrl",     getUploadUrl);
 
     // ── Public routes ───────────────────────────────────────────────────────
     this.httpApi.addRoutes({ path: "/profile",             methods: [apigatewayv2.HttpMethod.GET],                                          integration: intGetProfile });
@@ -202,6 +206,7 @@ export class ApiConstruct extends Construct {
     this.httpApi.addRoutes({ path: "/projects/{id}",       methods: [apigatewayv2.HttpMethod.GET],                                          integration: intGetProject });
     this.httpApi.addRoutes({ path: "/projects/{id}/media", methods: [apigatewayv2.HttpMethod.GET],                                          integration: intGetProjectMedia });
     this.httpApi.addRoutes({ path: "/timeline",            methods: [apigatewayv2.HttpMethod.GET],                                          integration: intGetTimeline });
+    this.httpApi.addRoutes({ path: "/tag-groups",          methods: [apigatewayv2.HttpMethod.GET],                                          integration: intGetTagGroups });
     this.httpApi.addRoutes({ path: "/contact",             methods: [apigatewayv2.HttpMethod.POST],                                         integration: intSubmitContact });
 
     // ── Admin routes (JWT required) ─────────────────────────────────────────
@@ -215,6 +220,8 @@ export class ApiConstruct extends Construct {
     this.httpApi.addRoutes({ path: "/admin/projects/{id}",      methods: [apigatewayv2.HttpMethod.PUT, apigatewayv2.HttpMethod.DELETE],      integration: intManageProjects,  ...adminOpts });
     this.httpApi.addRoutes({ path: "/admin/timeline",           methods: [apigatewayv2.HttpMethod.GET, apigatewayv2.HttpMethod.POST],        integration: intManageTimeline,  ...adminOpts });
     this.httpApi.addRoutes({ path: "/admin/timeline/{id}",      methods: [apigatewayv2.HttpMethod.PUT, apigatewayv2.HttpMethod.DELETE],      integration: intManageTimeline,  ...adminOpts });
-    this.httpApi.addRoutes({ path: "/admin/upload-url",         methods: [apigatewayv2.HttpMethod.POST],                                    integration: intGetUploadUrl,    ...adminOpts });
+    this.httpApi.addRoutes({ path: "/admin/tag-groups",          methods: [apigatewayv2.HttpMethod.GET, apigatewayv2.HttpMethod.POST],       integration: intManageTagGroups, ...adminOpts });
+    this.httpApi.addRoutes({ path: "/admin/tag-groups/{id}",     methods: [apigatewayv2.HttpMethod.PUT, apigatewayv2.HttpMethod.DELETE],      integration: intManageTagGroups, ...adminOpts });
+    this.httpApi.addRoutes({ path: "/admin/upload-url",          methods: [apigatewayv2.HttpMethod.POST],                                    integration: intGetUploadUrl,    ...adminOpts });
   }
 }
