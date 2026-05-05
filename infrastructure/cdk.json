@@ -15,8 +15,8 @@
     ]
   },
   "context": {
-    "cloudfrontCertArn": "",
-    "apiCertArn": "",
+    "cloudfrontCertArn": "arn:aws:acm:us-east-1:022289351927:certificate/534baeb6-66f8-41cb-a42c-c78fd2b1a9ac",
+    "apiCertArn": "arn:aws:acm:us-west-2:022289351927:certificate/8afd91a3-949d-43e9-9b1b-f6ec9470fb9e",
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,
     "@aws-cdk/core:target-partitions": ["aws", "aws-cn"],

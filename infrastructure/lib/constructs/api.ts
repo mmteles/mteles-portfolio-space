@@ -8,6 +8,9 @@ import * as authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import * as rds from "aws-cdk-lib/aws-rds";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -54,7 +57,7 @@ export class ApiConstruct extends Construct {
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64, // Graviton2 = faster + 20% cheaper
       vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       securityGroups: [lambdaSecurityGroup],
       environment: sharedEnv,
       timeout: cdk.Duration.seconds(15),
@@ -92,14 +95,40 @@ export class ApiConstruct extends Construct {
     const getProjectMedia = fn("GetProjectMedia", "public/get-project-media/index.ts");
     const getTimeline     = fn("GetTimeline",     "public/get-timeline/index.ts");
 
-    const gmailSecret = secretsmanager.Secret.fromSecretNameV2(
-      this, "GmailSecret", "/portfolio/gmail-credentials"
-    );
-    const submitContact = fn("SubmitContact", "public/submit-contact/index.ts", {
-      GMAIL_SECRET_ARN: gmailSecret.secretArn,
-      CONTACT_TO_EMAIL: "mteles@mteles.com",
+    // SNS topic decouples the in-VPC submit-contact Lambda from the email sender
+    const contactTopic = new sns.Topic(this, "ContactTopic", {
+      topicName: "portfolio-contact-notifications",
     });
-    gmailSecret.grantRead(submitContact);
+
+    const submitContact = fn("SubmitContact", "public/submit-contact/index.ts", {
+      SNS_TOPIC_ARN: contactTopic.topicArn,
+    });
+    contactTopic.grantPublish(submitContact);
+
+    // Email sender runs outside VPC so it can reach SES without a NAT or VPC endpoint
+    const sendContactEmail = new lambdaNodejs.NodejsFunction(this, "SendContactEmail", {
+      ...sharedLambdaConfig,
+      functionName: "portfolio-sendcontactemail",
+      entry: path.join(lambdaDir, "public/send-contact-email/index.ts"),
+      // No vpc — SES is a regional API endpoint reachable from the internet
+      vpc: undefined,
+      vpcSubnets: undefined,
+      securityGroups: undefined,
+      environment: {
+        NODE_OPTIONS: "--enable-source-maps",
+        CONTACT_TO_EMAIL: "mteles@mteles.com",
+        CONTACT_FROM_EMAIL: "contact@mteles.com",
+      },
+    });
+
+    sendContactEmail.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["ses:SendEmail", "ses:SendRawEmail"],
+      resources: ["*"],
+    }));
+
+    contactTopic.addSubscription(
+      new snsSubscriptions.LambdaSubscription(sendContactEmail)
+    );
 
     // ── Admin Lambda functions ─────────────────────────────────────────────
     const me              = fn("Me",              "admin/me/index.ts");
