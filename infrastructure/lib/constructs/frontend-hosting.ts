@@ -22,14 +22,13 @@ import { Construct } from "constructs";
 
 interface FrontendHostingProps {
   /**
-   * Optional custom domain, e.g. "mteles.com" or "www.mteles.com".
-   * If provided, also pass certificateArn.
+   * One or more custom domains (e.g. ["www.mteles.com", "mteles.com"]).
+   * If provided, also pass certificateArn covering all listed domains.
    */
-  customDomain?: string;
+  customDomains?: string[];
   /**
-   * ARN of an ACM certificate covering customDomain.
+   * ARN of an ACM certificate covering all customDomains.
    * Must be in us-east-1 (CloudFront requirement).
-   * Create via: aws acm request-certificate --region us-east-1 ...
    */
   certificateArn?: string;
 }
@@ -41,7 +40,7 @@ export class FrontendHostingConstruct extends Construct {
   constructor(scope: Construct, id: string, props: FrontendHostingProps = {}) {
     super(scope, id);
 
-    const { customDomain, certificateArn } = props;
+    const { customDomains, certificateArn } = props;
 
     // S3 bucket — no public access, served exclusively via CloudFront OAC
     this.bucket = new s3.Bucket(this, "FrontendBucket", {
@@ -55,10 +54,12 @@ export class FrontendHostingConstruct extends Construct {
       description: "Portfolio frontend OAC",
     });
 
-    // Certificate (only if custom domain is provided)
+    // Certificate (only if custom domains AND a cert ARN are both present)
+    const hasCustomDomains = Boolean(customDomains?.length && certificateArn);
+
     const certificate =
-      customDomain && certificateArn
-        ? acm.Certificate.fromCertificateArn(this, "Cert", certificateArn)
+      hasCustomDomains
+        ? acm.Certificate.fromCertificateArn(this, "Cert", certificateArn!)
         : undefined;
 
     // CloudFront distribution
@@ -88,7 +89,7 @@ export class FrontendHostingConstruct extends Construct {
         },
       ],
       defaultRootObject: "index.html",
-      domainNames: customDomain ? [customDomain] : undefined,
+      domainNames: hasCustomDomains ? customDomains : undefined,
       certificate,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     });
@@ -115,8 +116,8 @@ export class FrontendHostingConstruct extends Construct {
 
     new cdk.CfnOutput(this, "FrontendCdnDomain", {
       value: this.distribution.distributionDomainName,
-      description: customDomain
-        ? "Squarespace DNS: add CNAME record — Host: www, Points To: see Value field above"
+      description: customDomains?.length
+        ? "DNS: CNAME www → this value; ALIAS/ANAME @ → this value"
         : "Frontend CloudFront domain (no custom domain configured)",
     });
 
@@ -125,10 +126,10 @@ export class FrontendHostingConstruct extends Construct {
       description: "Set as AWS_CF_DISTRIBUTION_ID in GitHub Secrets",
     });
 
-    if (customDomain) {
+    if (customDomains?.length) {
       new cdk.CfnOutput(this, "SquarespaceCnameTarget", {
         value: this.distribution.distributionDomainName,
-        description: `Squarespace DNS: add CNAME record - Host: www, Points To: this value`,
+        description: `DNS: CNAME www → this value; ALIAS/ANAME @ → this value`,
       });
     }
   }

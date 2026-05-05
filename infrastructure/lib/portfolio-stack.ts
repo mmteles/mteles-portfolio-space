@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
+import * as ses from "aws-cdk-lib/aws-ses";
 import { Construct } from "constructs";
 import { DatabaseConstruct } from "./constructs/database";
 import { CognitoConstruct } from "./constructs/cognito";
@@ -35,7 +36,7 @@ export class PortfolioStack extends cdk.Stack {
 
     // ── Step 3: Frontend hosting on www.mteles.com ───────────────────────────
     const frontend = new FrontendHostingConstruct(this, "Frontend", {
-      customDomain: "www.mteles.com",
+      customDomains: ["www.mteles.com", "mteles.com"],
       certificateArn: cloudfrontCertArn,
     });
 
@@ -53,6 +54,7 @@ export class PortfolioStack extends cdk.Stack {
       corsOrigins: [
         `https://${frontend.distribution.distributionDomainName}`,
         "https://www.mteles.com",
+        "https://mteles.com",
       ],
     });
 
@@ -77,6 +79,12 @@ export class PortfolioStack extends cdk.Stack {
           "Squarespace DNS: add CNAME record — Host: api, Points To: this value",
       });
     }
+
+    // ── SES domain identity for sending contact emails ────────────────────────
+    // After deploy, add the DNS records output below to Squarespace to verify.
+    new ses.EmailIdentity(this, "SesEmailIdentity", {
+      identity: ses.Identity.domain("mteles.com"),
+    });
 
     // ── GitHub Actions OIDC (keyless AWS auth for CI/CD) ─────────────────────
     new GitHubOidcConstruct(this, "GithubOidc", {

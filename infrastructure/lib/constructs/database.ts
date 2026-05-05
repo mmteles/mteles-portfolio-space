@@ -13,10 +13,11 @@ export class DatabaseConstruct extends Construct {
   constructor(scope: Construct, id: string) {
     super(scope, id);
 
-    // VPC: 2 AZs, 1 NAT gateway so Lambda in private subnet can reach Secrets Manager & SES
+    // VPC: 2 AZs, no NAT Gateway — AWS services accessed via VPC endpoints.
+    // Removing NAT saves ~$32/month; Secrets Manager endpoint costs ~$7/month.
     this.vpc = new ec2.Vpc(this, "Vpc", {
       maxAzs: 2,
-      natGateways: 1, // 1 NAT gateway so Lambda in private subnet can reach Secrets Manager & SES
+      natGateways: 0,
       subnetConfiguration: [
         {
           cidrMask: 24,
@@ -36,6 +37,33 @@ export class DatabaseConstruct extends Construct {
       ],
     });
 
+    // S3 Gateway endpoint — free, routes S3 traffic within AWS backbone
+    this.vpc.addGatewayEndpoint("S3Endpoint", {
+      service: ec2.GatewayVpcEndpointAwsService.S3,
+    });
+
+    // Secrets Manager Interface endpoint — Lambda uses this instead of NAT for secret lookups
+    const endpointSg = new ec2.SecurityGroup(this, "EndpointSg", {
+      vpc: this.vpc,
+      description: "VPC interface endpoints (Secrets Manager)",
+      allowAllOutbound: false,
+    });
+
+    this.vpc.addInterfaceEndpoint("SecretsManagerEndpoint", {
+      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+      privateDnsEnabled: true,
+      securityGroups: [endpointSg],
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+    });
+
+    // SNS interface endpoint — allows submit-contact Lambda (PRIVATE_ISOLATED) to publish without NAT
+    this.vpc.addInterfaceEndpoint("SnsEndpoint", {
+      service: ec2.InterfaceVpcEndpointAwsService.SNS,
+      privateDnsEnabled: true,
+      securityGroups: [endpointSg],
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+    });
+
     // Three separate security groups: Lambda → Proxy → RDS
     // Merging proxy + RDS into one SG with allowAllOutbound:false breaks the
     // proxy's outbound TCP connection to port 5432, and a self-referencing
@@ -45,6 +73,13 @@ export class DatabaseConstruct extends Construct {
       description: "Lambda functions security group",
       allowAllOutbound: true,
     });
+
+    // Allow Lambda to reach the Secrets Manager interface endpoint
+    endpointSg.addIngressRule(
+      this.lambdaSecurityGroup,
+      ec2.Port.tcp(443),
+      "HTTPS from Lambda to VPC endpoint"
+    );
 
     const proxySg = new ec2.SecurityGroup(this, "ProxySg", {
       vpc: this.vpc,
