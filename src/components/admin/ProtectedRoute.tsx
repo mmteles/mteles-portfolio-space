@@ -1,32 +1,8 @@
-import { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
-const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { loading, isAdmin, user, signOut } = useAuth();
-
-  // Auto sign-out after 5 minutes of inactivity — only active while logged in
-  useEffect(() => {
-    if (!user) return;
-
-    let timer: ReturnType<typeof setTimeout>;
-
-    const resetTimer = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => signOut(), INACTIVITY_TIMEOUT);
-    };
-
-    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
-    events.forEach((e) => window.addEventListener(e, resetTimer, { passive: true }));
-    resetTimer(); // start immediately on login
-
-    return () => {
-      clearTimeout(timer);
-      events.forEach((e) => window.removeEventListener(e, resetTimer));
-    };
-  }, [user?.id]);
+  const { loading, isAdmin, user } = useAuth();
 
   if (loading) {
     return (
