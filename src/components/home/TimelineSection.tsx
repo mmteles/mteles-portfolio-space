@@ -6,6 +6,13 @@ import { cn } from "@/lib/utils";
 
 type FilterType = "all" | "work" | "education";
 
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "Present";
+  const [year, month] = dateStr.split("-").map(Number);
+  const monthName = new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "long" });
+  return `${monthName}/${year}`;
+}
+
 export default function TimelineSection() {
   const { data: entries = [] } = useTimeline();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -142,9 +149,9 @@ export default function TimelineSection() {
                               </p>
                             </div>
                             <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 pt-0.5">
-                              {entry.start_date}
+                              {formatDate(entry.start_date)}
                               {" — "}
-                              {entry.end_date || "Present"}
+                              {formatDate(entry.end_date)}
                             </span>
                           </div>
                         </div>

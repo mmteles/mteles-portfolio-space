@@ -227,12 +227,18 @@ export default function Login() {
               <p className="text-sm text-muted-foreground mb-6">
                 A 6-digit reset code has been sent to{" "}
                 <span className="font-medium text-foreground">{email}</span>.
-                Enter the code on the Reset Password page.
+                Enter the code below to set your new password.
               </p>
+              <Button
+                className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white mb-3"
+                onClick={() => navigate(`/reset-password?email=${encodeURIComponent(email)}`)}
+              >
+                Set New Password →
+              </Button>
               <button
                 type="button"
                 onClick={switchToSignIn}
-                className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 ← Back to sign in
               </button>
