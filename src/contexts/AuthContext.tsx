@@ -3,7 +3,7 @@ import {
   getCognitoToken,
   signIn as cognitoSignIn,
   signOut as cognitoSignOut,
-  getAdminStatus,
+  isAdminToken,
   getUserFromToken,
 } from "@/integrations/aws/auth";
 
@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const t = await getCognitoToken();
     setToken(t);
-    setIsAdmin(t ? await getAdminStatus() : false);
+    setIsAdmin(t ? isAdminToken(t) : false);
     setLoading(false);
   }, []);
 
