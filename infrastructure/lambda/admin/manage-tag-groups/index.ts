@@ -9,6 +9,23 @@ import { assertAdmin, getClaims } from "../../shared/auth";
 import { query } from "../../shared/db";
 import { ok, created, noContent, badRequest, notFound, serverError } from "../../shared/response";
 
+// Idempotent bootstrap — ensures the table exists before any DML runs.
+async function ensureSchema() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.tag_groups (
+      id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      name       TEXT        NOT NULL UNIQUE,
+      sort_order INTEGER     NOT NULL DEFAULT 0,
+      tags       TEXT[]      NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tag_groups_sort ON public.tag_groups (sort_order)`);
+}
+
+let schemaReady = false;
+
 export const handler = async (
   event: APIGatewayProxyEventV2WithJWTAuthorizer
 ): Promise<APIGatewayProxyResultV2> => {
@@ -16,6 +33,10 @@ export const handler = async (
   const id = event.pathParameters?.id;
 
   try {
+    if (!schemaReady) {
+      await ensureSchema();
+      schemaReady = true;
+    }
     assertAdmin(getClaims(event));
 
     // GET /admin/tag-groups
